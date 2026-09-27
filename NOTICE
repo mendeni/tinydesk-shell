@@ -1,0 +1,17 @@
+TinyDesk Shell (tdsh)
+Copyright (c) 2026 The TinyDesk Authors
+
+The TinyDesk Shell source code is released under the MIT licence (LICENSE).
+
+This repository also contains, and firmware built from it links, software
+developed by third parties under their own licences. See
+THIRD_PARTY_LICENSES.md and the licenses/ directory. In particular:
+
+  * third_party/wolfssh/ is wolfSSH 1.5.0, GPL-3.0 (see its LICENSING file).
+  * wolfSSL, fetched by the ESP-IDF component manager, is GPL-3.0 or
+    commercial.
+
+Firmware that includes the SSH/SFTP server (wolfSSH and wolfSSL) is
+therefore a combined work that may only be distributed under the terms of
+the GPL-3.0 (or with commercial wolfSSL/wolfSSH licences). The MIT licence
+of the TinyDesk Shell code itself is compatible with that.

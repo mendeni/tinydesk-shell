@@ -1,0 +1,25 @@
+# Third-party components
+
+TinyDesk Shell's own code is MIT (see `LICENSE`). These components keep
+their own licences:
+
+| Component | Version | Where it comes from | Licence | Notice |
+| --- | --- | --- | --- | --- |
+| wolfSSH | 1.5.0 | bundled in `third_party/wolfssh/` (without its `ide/` folder) | GPL-3.0 | `third_party/wolfssh/LICENSING`, `licenses/GPL-3.0.txt` |
+| wolfSSL | 5.8.2~1 | ESP-IDF component manager (`wolfssl/wolfssl`) | GPL-3.0 or commercial | its `LICENSE.txt` in `managed_components/` |
+| libsmb2 | 3.0.1 | component manager (`sahlberg/libsmb2`) | LGPL-2.1-or-later (library) | its `COPYING`, `licenses/LGPL-2.1.txt` |
+| LittleFS for ESP-IDF | 1.19.1 | component manager (`joltwallet/littlefs`) | MIT | its `LICENSE` |
+| littlefs | bundled by the above | component manager | BSD-3-Clause | `src/littlefs/LICENSE.md` of that component |
+| W6100 driver | 1.0.0 | component manager (`espressif/w6100`) | Apache-2.0 | its `LICENSE`, `licenses/Apache-2.0.txt` |
+| WIZnet common | 1.0.0 | component manager (`espressif/wiznet_common`) | Apache-2.0 | its `LICENSE`, `licenses/Apache-2.0.txt` |
+| ESP-IDF | 5.3.1 | your ESP-IDF installation (not included) | Apache-2.0, with binary blobs under Espressif's terms | ESP-IDF's own notices |
+
+`ports/esp_idf/components/wolfssh_local/` is TinyDesk Shell code (MIT): a
+build wrapper and an overlay header for wolfSSH, not a copy of wolfSSH.
+
+**Firmware binaries.** The ESP-IDF component always links the SSH/SFTP
+server (wolfSSH and wolfSSL), so firmware built from it is distributed under
+the GPL-3.0 as a whole: when you give someone such a binary, offer them the
+complete corresponding source (for example a link to the tagged
+repositories). The host (PC) builds contain no GPL code.
+

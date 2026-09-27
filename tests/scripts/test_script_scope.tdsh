@@ -1,0 +1,17 @@
+#!/bin/tdsh
+# uScript 1.1.1 explicit-script scope test
+#
+# Run:
+#   tdsh run ~/mnt/pc/test_script_scope.tdsh
+# Then:
+#   echo "$USCRIPT_SCOPE_PROBE"
+#
+# Expected at the interactive prompt: an empty line.
+
+USCRIPT_SCOPE_PROBE="this-must-not-leak"
+echo "inside script variable: $USCRIPT_SCOPE_PROBE"
+
+INNER_DIR=~/uscript_scope_dir
+mkdir -p $INNER_DIR
+cd $INNER_DIR
+echo "inside script pwd: $(pwd)"

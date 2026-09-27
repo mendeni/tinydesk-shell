@@ -1,0 +1,48 @@
+#!/bin/tdsh
+# uScript stack-safety smoke test
+# Run: tdsh run ~/stack_test.tdsh
+
+echo "=========================================="
+echo "        uScript stack safety test"
+echo "=========================================="
+
+A=10
+B=5
+C=$((A + B * 2))
+echo "arith=$C"
+
+function check
+    echo "function arg1=$1"
+    if "$1" == "ok"
+        echo "function condition=PASS"
+    else
+        echo "function condition=FAIL"
+        return 1
+    endif
+
+    INNER=$(echo substitution-inside-function)
+    echo "inner=$INNER"
+    return 0
+end
+
+check ok
+echo "function status=$?"
+
+ONE=$(echo hello)
+TWO=$(echo modern-substitution)
+THREE=$(echo $(echo nested))
+echo "one=$ONE"
+echo "two=$TWO"
+echo "three=$THREE"
+
+PIPE=$(echo pipeline-ok | cat)
+echo "pipe=$PIPE"
+
+I=0
+while $I < 3
+    echo "loop=$I"
+    I=$((I + 1))
+endwhile
+
+echo "RESULT: stack smoke test completed"
+return 0

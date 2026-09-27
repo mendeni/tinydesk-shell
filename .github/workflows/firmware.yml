@@ -1,0 +1,23 @@
+name: firmware
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.3.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: ESP32-C6 (the repository root)
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py build
+          idf.py size
+      - name: Classic ESP32 (projects/esp32)
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          cd projects/esp32
+          idf.py build
+          idf.py size

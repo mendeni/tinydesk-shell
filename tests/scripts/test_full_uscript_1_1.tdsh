@@ -1,0 +1,364 @@
+#!/bin/tdsh
+# uScript 1.1 comprehensive self-test for TinyDesk Shell ESP32-C6
+# Run with: tdsh run ~/test.tdsh
+
+FAILS=0
+TESTS=0
+
+function assert_eq
+    TESTS=$((TESTS + 1))
+    if "$1" == "$2"
+        echo "[PASS] $3"
+        return 0
+    else
+        echo "[FAIL] $3 expected='$2' actual='$1'"
+        FAILS=$((FAILS + 1))
+        return 1
+    endif
+end
+
+function status_seven
+    return 7
+end
+
+function add_two
+    ADD_RESULT=$(($1 + $2))
+    return 0
+end
+
+echo "=========================================="
+echo "        uScript 1.1 functionality test"
+echo "=========================================="
+echo "Script: $0"
+echo ""
+
+# 1. Variables + double/single quotes
+NAME="uScript"
+assert_eq "$NAME" "uScript" "variable assignment / double quotes"
+LITERAL='$NAME'
+assert_eq "$LITERAL" '$NAME' "single quotes suppress expansion"
+export EXPORTED=42
+assert_eq "$EXPORTED" "42" "export-style session variable"
+
+# 2. $? status
+false
+LAST=$?
+assert_eq "$LAST" "1" '$? captures previous command status'
+true
+LAST=$?
+assert_eq "$LAST" "0" "true returns status 0"
+
+# 3. Modern command substitution
+CAPTURED=$(echo hello-from-substitution)
+assert_eq "$CAPTURED" "hello-from-substitution" '$(command) substitution'
+
+# 4. Nested command substitution
+NESTED=$(echo $(echo nested-ok))
+assert_eq "$NESTED" "nested-ok" "nested command substitution"
+
+# 5. Integer arithmetic + precedence
+A=7
+B=5
+ARITH=$((A + B * 2))
+assert_eq "$ARITH" "17" "integer arithmetic precedence"
+LOGIC=$(((A > B) && (B == 5)))
+assert_eq "$LOGIC" "1" "arithmetic comparisons / logical operators"
+
+# 6. if / elseif / else
+CHOICE=2
+BRANCH=none
+if $CHOICE == 1
+    BRANCH=one
+elseif $CHOICE == 2
+    BRANCH=two
+else
+    BRANCH=other
+endif
+assert_eq "$BRANCH" "two" "if / elseif / else"
+
+# Command-status condition
+COND=bad
+if true
+    COND=good
+else
+    COND=bad
+endif
+assert_eq "$COND" "good" "command-status condition"
+
+# 8. while loop
+I=0
+SUM=0
+while $I < 4
+    SUM=$((SUM + I))
+    I=$((I + 1))
+endwhile
+assert_eq "$I" "4" "while loop iteration"
+assert_eq "$SUM" "6" "while loop arithmetic"
+
+# 9. for loop
+WORDS=""
+for W in alpha beta gamma
+    WORDS="${WORDS}${W},"
+endfor
+assert_eq "$WORDS" "alpha,beta,gamma," "for ... in loop"
+
+# 10. break + continue
+SEQ=""
+for N in 1 2 3 4 5
+    if $N == 2
+        continue
+    endif
+    if $N == 4
+        break
+    endif
+    SEQ="${SEQ}${N}"
+endfor
+assert_eq "$SEQ" "13" "break / continue"
+
+# 11. Functions + positional args + $#
+add_two 10 23
+assert_eq "$ADD_RESULT" "33" "function call + positional parameters"
+
+function count_args
+    COUNT_RESULT=$#
+    FIRST_ARG=$1
+    SECOND_ARG=$2
+    return 0
+end
+count_args red blue green
+assert_eq "$COUNT_RESULT" "3" 'function $# argument count'
+assert_eq "$FIRST_ARG" "red" 'function $1'
+assert_eq "$SECOND_ARG" "blue" 'function $2'
+
+# 12. return status
+status_seven
+RET=$?
+assert_eq "$RET" "7" "function return status"
+
+# 12. && and ||
+AND_RESULT=no
+true && AND_RESULT=yes
+assert_eq "$AND_RESULT" "yes" "&& executes RHS after success"
+
+AND_SKIP=good
+false && AND_SKIP=bad
+assert_eq "$AND_SKIP" "good" "&& skips RHS after failure"
+
+OR_RESULT=bad
+false || OR_RESULT=good
+assert_eq "$OR_RESULT" "good" "|| executes RHS after failure"
+
+OR_SKIP=good
+true || OR_SKIP=bad
+assert_eq "$OR_SKIP" "good" "|| skips RHS after success"
+
+# 13. Memory-backed pipeline. cat without a filename consumes stdin.
+PIPE_RESULT=$(echo pipeline-ok | cat)
+assert_eq "$PIPE_RESULT" "pipeline-ok" "memory-backed pipeline"
+
+echo direct-pipe-ok | cat
+
+# 15. Semicolon command chaining
+SEMI=before; SEMI=after
+assert_eq "$SEMI" "after" "semicolon command chaining"
+
+# 15. Braced variables / string concatenation
+LEFT=ESP32
+RIGHT=C6
+JOINED="${LEFT}-${RIGHT}"
+assert_eq "$JOINED" "ESP32-C6" "braced variable concatenation"
+
+
+# --------------------------------------------------
+# uScript 1.1: generic redirection
+# --------------------------------------------------
+SHELLROOT=~/uscript_1_1_test
+if test -d $SHELLROOT
+    rm -r -y $SHELLROOT
+endif
+mkdir -p $SHELLROOT
+mkdir -p $SHELLROOT/copies
+
+echo alpha > $SHELLROOT/redir.txt
+REDIR=$(cat $SHELLROOT/redir.txt)
+assert_eq "$REDIR" "alpha" "generic > redirection"
+
+echo beta >> $SHELLROOT/redir.txt
+REDIR=$(cat $SHELLROOT/redir.txt)
+assert_eq "$REDIR" "alpha beta" "generic >> redirection"
+
+INPUT=$(cat < $SHELLROOT/redir.txt)
+assert_eq "$INPUT" "alpha beta" "generic < redirection"
+
+cat < $SHELLROOT/redir.txt > $SHELLROOT/redir_copy.txt
+REDIRCOPY=$(cat $SHELLROOT/redir_copy.txt)
+assert_eq "$REDIRCOPY" "alpha beta" "combined < and > redirection"
+
+pwd > $SHELLROOT/pwd.txt
+if test -s $SHELLROOT/pwd.txt
+    assert_eq "yes" "yes" "redirection works for non-echo commands"
+else
+    assert_eq "no" "yes" "redirection works for non-echo commands"
+endif
+
+# --------------------------------------------------
+# uScript 1.1: globbing
+# --------------------------------------------------
+echo a > $SHELLROOT/a.globtxt
+echo b > $SHELLROOT/b.globtxt
+echo c > $SHELLROOT/c.bin
+echo q > $SHELLROOT/q1.log
+echo q > $SHELLROOT/q2.log
+
+GLOB=$(echo $SHELLROOT/*.globtxt)
+if test -n "$GLOB"
+    assert_eq "yes" "yes" "glob * expansion"
+else
+    assert_eq "no" "yes" "glob * expansion"
+endif
+
+QGLOB=$(echo $SHELLROOT/q?.log)
+if test -n "$QGLOB"
+    assert_eq "yes" "yes" "glob ? expansion"
+else
+    assert_eq "no" "yes" "glob ? expansion"
+endif
+
+QUOTED=$(echo "$SHELLROOT/*.globtxt")
+assert_eq "$QUOTED" "$SHELLROOT/*.globtxt" "quoted glob remains literal"
+
+UNMATCHED=$(echo $SHELLROOT/*.nothing_here)
+assert_eq "$UNMATCHED" "$SHELLROOT/*.nothing_here" "unmatched glob remains literal"
+
+GCOUNT=0
+for GF in $SHELLROOT/q?.log
+    GCOUNT=$((GCOUNT + 1))
+endfor
+assert_eq "$GCOUNT" "2" "glob expansion in for list"
+
+cp $SHELLROOT/q?.log $SHELLROOT/copies
+if test -f $SHELLROOT/copies/q1.log
+    if test -f $SHELLROOT/copies/q2.log
+        assert_eq "yes" "yes" "glob argv expansion for normal commands"
+    else
+        assert_eq "no" "yes" "glob argv expansion for normal commands"
+    endif
+else
+    assert_eq "no" "yes" "glob argv expansion for normal commands"
+endif
+
+# --------------------------------------------------
+# uScript 1.1: test and [ ... ]
+# --------------------------------------------------
+if test -e $SHELLROOT/redir.txt
+    assert_eq "yes" "yes" "test -e"
+else
+    assert_eq "no" "yes" "test -e"
+endif
+
+if test -f $SHELLROOT/redir.txt
+    assert_eq "yes" "yes" "test -f"
+else
+    assert_eq "no" "yes" "test -f"
+endif
+
+if test -d $SHELLROOT
+    assert_eq "yes" "yes" "test -d"
+else
+    assert_eq "no" "yes" "test -d"
+endif
+
+if test -s $SHELLROOT/redir.txt
+    assert_eq "yes" "yes" "test -s"
+else
+    assert_eq "no" "yes" "test -s"
+endif
+
+if test ! -e $SHELLROOT/not_here
+    assert_eq "yes" "yes" "test ! predicate"
+else
+    assert_eq "no" "yes" "test ! predicate"
+endif
+
+if test -n "hello"
+    assert_eq "yes" "yes" "test -n"
+else
+    assert_eq "no" "yes" "test -n"
+endif
+
+EMPTY11=""
+if test -z "$EMPTY11"
+    assert_eq "yes" "yes" "test -z"
+else
+    assert_eq "no" "yes" "test -z"
+endif
+
+if [ "abc" = "abc" ]
+    assert_eq "yes" "yes" "[ string = ]"
+else
+    assert_eq "no" "yes" "[ string = ]"
+endif
+
+if [ "abc" != "xyz" ]
+    assert_eq "yes" "yes" "[ string != ]"
+else
+    assert_eq "no" "yes" "[ string != ]"
+endif
+
+if [ 10 -eq 10 ]
+    assert_eq "yes" "yes" "[ integer -eq ]"
+else
+    assert_eq "no" "yes" "[ integer -eq ]"
+endif
+
+if [ 10 -ne 11 ]
+    assert_eq "yes" "yes" "[ integer -ne ]"
+else
+    assert_eq "no" "yes" "[ integer -ne ]"
+endif
+
+if [ 2 -lt 10 ]
+    assert_eq "yes" "yes" "[ integer -lt ]"
+else
+    assert_eq "no" "yes" "[ integer -lt ]"
+endif
+
+if [ 2 -le 2 ]
+    assert_eq "yes" "yes" "[ integer -le ]"
+else
+    assert_eq "no" "yes" "[ integer -le ]"
+endif
+
+if [ 10 -gt 2 ]
+    assert_eq "yes" "yes" "[ integer -gt ]"
+else
+    assert_eq "no" "yes" "[ integer -gt ]"
+endif
+
+if [ 10 -ge 10 ]
+    assert_eq "yes" "yes" "[ integer -ge ]"
+else
+    assert_eq "no" "yes" "[ integer -ge ]"
+endif
+
+# Redirection remains composable with the memory-backed pipeline.
+echo pipe-redir | cat > $SHELLROOT/pipe.txt
+PIPEREDIR=$(cat $SHELLROOT/pipe.txt)
+assert_eq "$PIPEREDIR" "pipe-redir" "pipeline + output redirection"
+
+cat < $SHELLROOT/redir.txt | cat > $SHELLROOT/pipe_input.txt
+PIPEINPUT=$(cat $SHELLROOT/pipe_input.txt)
+assert_eq "$PIPEINPUT" "alpha beta" "input redirection + pipeline"
+
+echo ""
+echo "=========================================="
+echo "uScript tests executed: $TESTS"
+echo "uScript failures:       $FAILS"
+if $FAILS == 0
+    echo "RESULT: ALL uScript TESTS PASSED"
+else
+    echo "RESULT: uScript TEST FAILED"
+endif
+echo "=========================================="
+
+return $FAILS

@@ -1,0 +1,192 @@
+#include "tdsh_espidf.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "esp_heap_caps.h"
+#include "esp_log.h"
+#include "esp_random.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+
+static const char *TAG = "tdsh-port";
+
+typedef struct {
+    tdsh_worker_fn_t worker;
+    tdsh_worker_cleanup_fn_t cleanup;
+    void *arg;
+    SemaphoreHandle_t done;
+    int result;
+    bool background;
+    char name[20];
+    /* the worker inherits the caller's stdio so script
+     * output reaches the same terminal (window, SSH session, ...). */
+    FILE *std_in, *std_out, *std_err;
+} worker_ctx_t;
+
+static uint64_t idf_monotonic_ms(void *ctx)
+{
+    (void)ctx;
+    return (uint64_t)esp_timer_get_time() / 1000ULL;
+}
+
+static void idf_sleep_ms(void *ctx, uint32_t ms)
+{
+    (void)ctx;
+    if (ms == 0) { taskYIELD(); return; }
+    TickType_t ticks = pdMS_TO_TICKS(ms);
+    if (ticks == 0) ticks = 1;
+    vTaskDelay(ticks);
+}
+
+static void idf_yield(void *ctx)
+{
+    (void)ctx;
+    taskYIELD();
+}
+
+static int idf_random_bytes(void *ctx, void *buffer, size_t length)
+{
+    (void)ctx;
+    if (!buffer && length) return -EINVAL;
+    esp_fill_random(buffer, length);
+    return 0;
+}
+
+static void *idf_malloc(void *ctx, size_t size)
+{
+    (void)ctx;
+    return heap_caps_malloc(size, MALLOC_CAP_8BIT);
+}
+
+static void *idf_calloc(void *ctx, size_t count, size_t size)
+{
+    (void)ctx;
+    return heap_caps_calloc(count, size, MALLOC_CAP_8BIT);
+}
+
+static void *idf_realloc(void *ctx, void *ptr, size_t size)
+{
+    (void)ctx;
+    return heap_caps_realloc(ptr, size, MALLOC_CAP_8BIT);
+}
+
+static void idf_free(void *ctx, void *ptr)
+{
+    (void)ctx;
+    heap_caps_free(ptr);
+}
+
+static void worker_task(void *opaque)
+{
+    worker_ctx_t *ctx = opaque;
+    stdin = ctx->std_in;
+    stdout = ctx->std_out;
+    stderr = ctx->std_err;
+    ctx->result = ctx->worker(ctx->arg);
+    if (ctx->cleanup) ctx->cleanup(ctx->arg);
+    /* Newlib closes a deleted task's stdio when it differs from the global
+     * streams; hand the borrowed streams back first. */
+    stdin = _REENT_STDIN(_GLOBAL_REENT);
+    stdout = _REENT_STDOUT(_GLOBAL_REENT);
+    stderr = _REENT_STDERR(_GLOBAL_REENT);
+
+    UBaseType_t free_stack = uxTaskGetStackHighWaterMark(NULL);
+    if (free_stack < 4096U) {
+        ESP_LOGW(TAG, "%s low stack: minimum free=%u bytes",
+                 ctx->name, (unsigned)free_stack);
+    } else {
+        ESP_LOGD(TAG, "%s minimum free stack=%u bytes",
+                 ctx->name, (unsigned)free_stack);
+    }
+
+    if (ctx->background) {
+        ESP_LOGI(TAG, "%s finished status=%d", ctx->name, ctx->result);
+        heap_caps_free(ctx);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    xSemaphoreGive(ctx->done);
+    vTaskDelete(NULL);
+}
+
+static int idf_worker_run(void *context,
+                          const char *name,
+                          size_t stack_bytes,
+                          int priority,
+                          bool background,
+                          tdsh_worker_fn_t worker,
+                          void *arg,
+                          tdsh_worker_cleanup_fn_t cleanup,
+                          int *result_out)
+{
+    (void)context;
+    if (!worker || stack_bytes == 0) return -EINVAL;
+
+    worker_ctx_t *ctx = heap_caps_calloc(1, sizeof(*ctx), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!ctx) return -ENOMEM;
+    ctx->worker = worker;
+    ctx->cleanup = cleanup;
+    ctx->arg = arg;
+    ctx->background = background;
+    /* Foreground workers always share the caller's stdio (the caller waits
+     * for them). Background workers only do so from the local console, whose
+     * streams live forever; an SSH stream is closed when its session ends. */
+    bool inherit = !background || tdsh_is_local_console_task();
+    ctx->std_in = inherit ? stdin : _REENT_STDIN(_GLOBAL_REENT);
+    ctx->std_out = inherit ? stdout : _REENT_STDOUT(_GLOBAL_REENT);
+    ctx->std_err = inherit ? stderr : _REENT_STDERR(_GLOBAL_REENT);
+    snprintf(ctx->name, sizeof(ctx->name), "%s", name ? name : "tdsh_worker");
+
+    if (!background) {
+        ctx->done = xSemaphoreCreateBinary();
+        if (!ctx->done) {
+            heap_caps_free(ctx);
+            return -ENOMEM;
+        }
+    }
+
+    BaseType_t ok = xTaskCreate(worker_task,
+                                ctx->name,
+                                (uint32_t)stack_bytes,
+                                ctx,
+                                (UBaseType_t)priority,
+                                NULL);
+    if (ok != pdPASS) {
+        if (ctx->done) vSemaphoreDelete(ctx->done);
+        heap_caps_free(ctx);
+        return -ENOMEM;
+    }
+
+    /* Ownership of arg transferred after successful xTaskCreate. */
+    if (background) return 0;
+
+    xSemaphoreTake(ctx->done, portMAX_DELAY);
+    if (result_out) *result_out = ctx->result;
+    vSemaphoreDelete(ctx->done);
+    heap_caps_free(ctx);
+    return 0;
+}
+
+static const tdsh_platform_api_t s_idf_platform = {
+    .name = "esp-idf/freertos",
+    .context = NULL,
+    .monotonic_ms = idf_monotonic_ms,
+    .sleep_ms = idf_sleep_ms,
+    .yield = idf_yield,
+    .random_bytes = idf_random_bytes,
+    .malloc_fn = idf_malloc,
+    .calloc_fn = idf_calloc,
+    .realloc_fn = idf_realloc,
+    .free_fn = idf_free,
+    .worker_run = idf_worker_run,
+};
+
+const tdsh_platform_api_t *tdsh_espidf_platform(void)
+{
+    return &s_idf_platform;
+}

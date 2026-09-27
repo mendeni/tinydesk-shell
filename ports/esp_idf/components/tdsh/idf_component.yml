@@ -1,0 +1,13 @@
+dependencies:
+  idf:
+    version: "=5.3.1"
+  joltwallet/littlefs:
+    version: "1.19.1"
+  wolfssl/wolfssl:
+    version: "5.8.2~1"
+  espressif/w6100:
+    version: "1.0.0"
+  sahlberg/libsmb2:
+    version: "3.0.1"
+  espressif/wiznet_common:
+    version: "1.0.0"

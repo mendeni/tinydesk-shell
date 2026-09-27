@@ -1,0 +1,45 @@
+menu "TinyDesk Shell network hardware (fallbacks)"
+
+    comment "Pins normally come from the board configuration (board.conf, keys eth.*)."
+
+    config TDSH_W6100_SPI_HOST
+        int "W6100 SPI host ID"
+        default 1
+        help
+            SPI host used by the W6100. ESP32-C6 commonly uses SPI2_HOST (ID 1).
+
+    config TDSH_W6100_MISO_GPIO
+        int "W6100 MISO GPIO (-1 = configure from TinyDesk Shell)"
+        default -1
+
+    config TDSH_W6100_MOSI_GPIO
+        int "W6100 MOSI GPIO (-1 = configure from TinyDesk Shell)"
+        default -1
+
+    config TDSH_W6100_SCLK_GPIO
+        int "W6100 SCLK GPIO (-1 = configure from TinyDesk Shell)"
+        default -1
+
+    config TDSH_W6100_CS_GPIO
+        int "W6100 CS GPIO"
+        default -1
+
+    config TDSH_W6100_INT_GPIO
+        int "W6100 INT GPIO (-1 = polling mode)"
+        default -1
+
+    config TDSH_W6100_RST_GPIO
+        int "W6100 RESET GPIO (-1 = no reset pin)"
+        default -1
+
+    config TDSH_W6100_SPI_CLOCK_MHZ
+        int "W6100 SPI clock (MHz)"
+        range 1 40
+        default 10
+
+    config TDSH_W6100_POLL_MS
+        int "W6100 polling period when INT is unused (ms)"
+        range 10 5000
+        default 100
+
+endmenu

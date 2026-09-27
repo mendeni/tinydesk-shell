@@ -1,0 +1,143 @@
+# TinyDesk Shell
+
+**A Unix-like shell for microcontrollers, with users, networking and SSH,
+that also runs on a PC.** TinyDesk Shell (`tdsh`) is the
+shell inside [TinyDesk](https://github.com/schikani/tinydesk), the
+terminal desktop for microcontrollers, and works on its own too.
+
+![TinyDesk Shell on an ESP32 serial console](docs/images/terminal.png)
+
+*Actual serial-console capture of the standalone firmware.*
+
+* Parser with variables, quoting, redirection, pipelines, command
+  substitution, arithmetic and conditions; scripts (`.tdsh`, uScript 1.1.1).
+* Line editor: Tab completion, history, arrows, Home/End, Ctrl+A/E/U/K/L/C.
+* Files on LittleFS (`/fs`), `nano`, `write`; per-user homes with a sandbox.
+* Users in NVS with salted, hashed passwords; `login`, `passwd`, boot user,
+  physical-console recovery.
+* Wi-Fi (per-user saved networks), W6100 Ethernet, LAN/Wi-Fi policy,
+  `ping`, SNTP time, time zones.
+* SSH/SFTP server (wolfSSH, per-device host key), FTP server, SMB2/3 mounts.
+* **Board configuration**: pins for RS-485, Ethernet and SD come from a
+  `key = value` file (`board` command, `tdsh_board.h`), not from the code.
+* Hardware loopback tests (`hwtest`), heap and task information.
+* A portable core with a POSIX host port and regression tests.
+
+The C API uses the prefix `tdsh_` (`tdsh.h`, `tdsh_espidf.h`); scripts end in `.tdsh`.
+
+## Get the source
+
+This is a developer preview. The public web installer is not available yet.
+
+```bash
+git clone https://github.com/schikani/tinydesk-shell.git
+cd tinydesk-shell
+```
+
+## Build the firmware (ESP-IDF 5.3.1)
+
+| Board | Project | Console |
+| --- | --- | --- |
+| ESP32-C6, 8 MB flash | the repository root | built-in USB Serial/JTAG |
+| classic ESP32, 4 MB flash or more, PSRAM optional | `projects/esp32` | UART0 (the USB-UART chip), 115200 baud |
+
+```bash
+idf.py build                       # in the root, or in projects/esp32
+idf.py -p PORT flash monitor
+```
+
+On Windows, `build_windows.cmd` runs an environment check first
+(`build_windows.cmd -p COM7 flash monitor`). The ESP-IDF component manager
+downloads the dependencies declared in
+`ports/esp_idf/components/tdsh/idf_component.yml`.
+
+You start as root; the factory root password (for SSH, FTP and `login`) is
+`TinyDesk`: change it locally with `passwd` before remote access. SSH and FTP
+refuse remote authentication while the factory root password remains. Then, for example:
+
+```text
+wifiadd MyNetwork mypassword  # save a network (per user)
+wificonnect
+ssh start
+hello                         # the example application command (main/main.c)
+```
+
+### Your board's pins
+
+RS-485 lines, a W6100 Ethernet chip and an SD card are configured with
+`key = value` settings, not in the code. Copy the project's
+`board.example.conf` to `board.conf` (ignored by git) and edit it before
+building, or set them on the running board as root:
+
+```text
+board set eth.chip w6100
+board set eth.miso 2
+...
+reboot
+```
+
+`board show` lists the settings. See the annotated
+[board.example.conf](board.example.conf) for keys and defaults.
+
+> The partition tables: ESP32-C6: application at `0x10000` (3 MB), LittleFS
+`storage` at `0x310000`; classic ESP32: application at `0x10000` (2.5 MB),
+LittleFS at `0x290000` (1.4 MB). The file system is formatted if it cannot be
+mounted. Do not use `erase-flash` as a routine step.
+
+## Embed it in your ESP-IDF application
+
+Add `ports/esp_idf/components` to `EXTRA_COMPONENT_DIRS`, then:
+
+```c
+#include "tdsh_espidf.h"
+
+extern const char board_conf[] asm("_binary_board_conf_start");   /* optional, EMBED_TXTFILES */
+
+tdsh_espidf_config_t cfg = TDSH_ESP_IDF_CONFIG_DEFAULT();
+cfg.hostname = "mydevice";
+cfg.board_config = board_conf;            /* built-in pins; /fs/etc/board.conf overrides them */
+ESP_ERROR_CHECK(tdsh_espidf_init(&cfg));
+ESP_ERROR_CHECK(tdsh_espidf_start());   /* the ESP-IDF console: USB Serial/JTAG or UART */
+```
+
+Register your own commands with `tdsh_register_commands()`. See
+`docs/EMBEDDING.md` and `examples/esp_idf/embed_in_app`.
+TinyDesk embeds the shell this way and runs its console in a desktop window.
+An integration that shares this console with a remote transport must call
+`tdsh_console_mark_remote()` **before** accepting remote input and refuse the
+connection if it returns false. This prevents remote use of physical password
+recovery; successful takeover revokes physical trust until reboot.
+
+## Host build and tests (Linux, WSL)
+
+```bash
+cmake -S . -B build-host -G Ninja -DTDSH_BUILD_HOST=ON
+cmake --build build-host
+ctest --test-dir build-host --output-on-failure
+```
+
+`docs/POSIX_HOST.md` explains the host port's file layout.
+
+## Documentation
+
+| File | Content |
+| --- | --- |
+| `docs/FUNCTIONS.md` | API and command inventory |
+| `docs/ARCHITECTURE.md`, `docs/PORTING.md` | structure, porting to another platform |
+| `docs/DEPENDENCIES.md` | component versions |
+| `CHANGELOG.md` | changes per version |
+
+## Licence
+
+TinyDesk Shell is released under the [MIT licence](LICENSE).
+
+Third-party components keep their own licences: see
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) and [NOTICE](NOTICE).
+Firmware built with the ESP-IDF component includes wolfSSH and wolfSSL
+(GPL-3.0) and is therefore distributed under the GPL-3.0 as a whole.
+
+## Contributing
+
+Issues and pull requests are welcome. Run the host tests and build the
+standalone firmware before sending a change, and keep board-specific pins
+out of the code (use board configuration keys).

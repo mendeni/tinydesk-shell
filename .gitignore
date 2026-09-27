@@ -1,0 +1,17 @@
+# Build output and downloaded components (any project folder)
+build/
+build-*/
+managed_components/
+
+# ESP-IDF per-machine configuration (regenerated from sdkconfig.defaults)
+sdkconfig
+sdkconfig.old
+*.log
+
+# Your own board wiring (see board.example.conf)
+board.conf
+
+*.pyc
+__pycache__/
+.vscode/
+.idea/

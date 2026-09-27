@@ -1,0 +1,256 @@
+#!/bin/tdsh
+# uScript 1.1 shell-features test
+# Tests: >, >>, <, globbing (* ?), test and [ ... ]
+
+echo "=========================================="
+echo "      uScript 1.1 shell feature test"
+echo "=========================================="
+
+TESTS=0
+FAILS=0
+ROOT=~/uscript_shell_test
+
+function pass
+    TESTS=$((TESTS + 1))
+    echo "[PASS] $1"
+end
+
+function fail
+    TESTS=$((TESTS + 1))
+    FAILS=$((FAILS + 1))
+    echo "[FAIL] $1"
+end
+
+function assert_eq
+    if "$1" == "$2"
+        pass "$3"
+    else
+        echo "       expected='$2' actual='$1'"
+        fail "$3"
+    endif
+end
+
+# Clean/create test area. Ignore a missing old directory.
+if test -d $ROOT
+    rm -r -y $ROOT
+endif
+mkdir -p $ROOT
+mkdir -p $ROOT/copies
+
+# --------------------------------------------------
+# 1. Generic output redirection >
+# --------------------------------------------------
+echo alpha > $ROOT/a.txt
+VALUE=$(cat $ROOT/a.txt)
+assert_eq "$VALUE" "alpha" "output redirection >"
+
+# Redirection must work for commands other than echo.
+pwd > $ROOT/pwd.txt
+if test -s $ROOT/pwd.txt
+    pass "generic command stdout redirection"
+else
+    fail "generic command stdout redirection"
+endif
+
+# --------------------------------------------------
+# 2. Append redirection >>
+# --------------------------------------------------
+echo beta >> $ROOT/a.txt
+LINES=$(cat $ROOT/a.txt)
+assert_eq "$LINES" "alpha beta" "append redirection >>"
+
+# --------------------------------------------------
+# 3. Input redirection <
+# --------------------------------------------------
+INPUT=$(cat < $ROOT/a.txt)
+assert_eq "$INPUT" "alpha beta" "input redirection <"
+
+# Combined input + output.
+cat < $ROOT/a.txt > $ROOT/copy.txt
+COPY=$(cat $ROOT/copy.txt)
+assert_eq "$COPY" "alpha beta" "combined < and >"
+
+# Redirection-only command creates/truncates a file.
+> $ROOT/empty.txt
+if test -e $ROOT/empty.txt
+    pass "redirection-only file creation"
+else
+    fail "redirection-only file creation"
+endif
+
+# --------------------------------------------------
+# 4. Glob expansion
+# --------------------------------------------------
+echo one > $ROOT/one.txt
+echo two > $ROOT/two.txt
+echo x > $ROOT/other.bin
+echo q > $ROOT/q1.log
+echo q > $ROOT/q2.log
+
+TXT=$(echo $ROOT/*.txt)
+if test -n "$TXT"
+    pass "glob * expands matching files"
+else
+    fail "glob * expands matching files"
+endif
+
+QMARK=$(echo $ROOT/q?.log)
+if test -n "$QMARK"
+    pass "glob ? expands one-character matches"
+else
+    fail "glob ? expands one-character matches"
+endif
+
+# A quoted wildcard must remain literal.
+LITERAL=$(echo "$ROOT/*.txt")
+assert_eq "$LITERAL" "$ROOT/*.txt" "quoted wildcard stays literal"
+
+# An unmatched pattern stays unchanged.
+NOMATCH=$(echo $ROOT/*.does_not_exist)
+assert_eq "$NOMATCH" "$ROOT/*.does_not_exist" "unmatched glob stays literal"
+
+# Globs are available in for-loop item lists too.
+COUNT=0
+for F in $ROOT/q?.log
+    COUNT=$((COUNT + 1))
+endfor
+assert_eq "$COUNT" "2" "glob expansion inside for ... in"
+
+# And ordinary commands receive expanded argv.
+cp $ROOT/q?.log $ROOT/copies
+if test -f $ROOT/copies/q1.log
+    if test -f $ROOT/copies/q2.log
+        pass "glob expansion passed to normal commands"
+    else
+        fail "glob expansion passed to normal commands"
+    endif
+else
+    fail "glob expansion passed to normal commands"
+endif
+
+# --------------------------------------------------
+# 5. test / [ ... ] file predicates
+# --------------------------------------------------
+if test -e $ROOT/a.txt
+    pass "test -e"
+else
+    fail "test -e"
+endif
+
+if test -f $ROOT/a.txt
+    pass "test -f"
+else
+    fail "test -f"
+endif
+
+if test -d $ROOT
+    pass "test -d"
+else
+    fail "test -d"
+endif
+
+if test -s $ROOT/a.txt
+    pass "test -s"
+else
+    fail "test -s"
+endif
+
+if test ! -e $ROOT/not_here
+    pass "test ! predicate"
+else
+    fail "test ! predicate"
+endif
+
+# --------------------------------------------------
+# 6. test string predicates/comparisons
+# --------------------------------------------------
+if test -n "hello"
+    pass "test -n"
+else
+    fail "test -n"
+endif
+
+EMPTY=""
+if test -z "$EMPTY"
+    pass "test -z"
+else
+    fail "test -z"
+endif
+
+if test "abc" = "abc"
+    pass "test string ="
+else
+    fail "test string ="
+endif
+
+if [ "abc" != "xyz" ]
+    pass "[ string != ]"
+else
+    fail "[ string != ]"
+endif
+
+# --------------------------------------------------
+# 7. Integer test comparisons
+# --------------------------------------------------
+if [ 10 -eq 10 ]
+    pass "[ integer -eq ]"
+else
+    fail "[ integer -eq ]"
+endif
+
+if [ 10 -ne 11 ]
+    pass "[ integer -ne ]"
+else
+    fail "[ integer -ne ]"
+endif
+
+if [ 2 -lt 10 ]
+    pass "[ integer -lt ]"
+else
+    fail "[ integer -lt ]"
+endif
+
+if [ 2 -le 2 ]
+    pass "[ integer -le ]"
+else
+    fail "[ integer -le ]"
+endif
+
+if [ 10 -gt 2 ]
+    pass "[ integer -gt ]"
+else
+    fail "[ integer -gt ]"
+endif
+
+if [ 10 -ge 10 ]
+    pass "[ integer -ge ]"
+else
+    fail "[ integer -ge ]"
+endif
+
+# --------------------------------------------------
+# 8. Redirection + pipeline interaction
+# --------------------------------------------------
+echo pipeline-data | cat > $ROOT/pipeline.txt
+PIPE=$(cat $ROOT/pipeline.txt)
+assert_eq "$PIPE" "pipeline-data" "pipeline output redirected to file"
+
+cat < $ROOT/a.txt | cat > $ROOT/pipeline_input.txt
+PIPEIN=$(cat $ROOT/pipeline_input.txt)
+assert_eq "$PIPEIN" "alpha beta" "input redirection feeding pipeline"
+
+echo ""
+echo "=========================================="
+echo "uScript 1.1 tests executed: $TESTS"
+echo "uScript 1.1 failures:       $FAILS"
+if $FAILS == 0
+    echo "RESULT: ALL uScript 1.1 TESTS PASSED"
+else
+    echo "RESULT: uScript 1.1 TEST FAILED"
+endif
+echo "=========================================="
+
+# Cleanup intentionally left available for inspection:
+# rm -r -y $ROOT
+
+return $FAILS
