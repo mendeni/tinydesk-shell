@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* Documentation: `docs/SCRIPTING.md`, the reference for `.tdsh` scripts
+  (running them, variables and quoting, `$(…)` and `$((…))`, conditions,
+  loops, functions, pipes and redirection, limits, a tested example), and
+  a Scripts section in the README.
+
 ## 0.1.0 (2026-09-26): first release
 
 ### Name, licence, layout

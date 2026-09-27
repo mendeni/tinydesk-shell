@@ -118,10 +118,53 @@ ctest --test-dir build-host --output-on-failure
 
 `docs/POSIX_HOST.md` explains the host port's file layout.
 
+## Scripts
+
+Put commands in a `.tdsh` file and run it with `tdsh run`. The script
+language (uScript 1.1.1) has variables, single and double quotes, `$(…)`,
+integer arithmetic `$((…))`, `if`/`elseif`/`else`/`endif`,
+`while`/`endwhile`, `for … in`/`endfor` (with `*` and `?` globs),
+`break`/`continue`, functions with arguments and return status
+(`function`/`end`, `$1`, `$#`, `$?`), `test` and `[ … ]`, pipes,
+`>`, `>>` and `<` redirection, and `&&`, `||` and `;`.
+
+```sh
+#!/bin/tdsh
+function check
+    if test -f "$1"
+        echo "$1: $(cat $1)"
+        return 0
+    endif
+    echo "$1 is missing"
+    return 1
+end
+
+for F in ~/logs/*.txt
+    check $F || echo "problem with $F"
+endfor
+N=$((3 * 4 + 1))
+if $N >= 10
+    echo "N is $N"
+endif
+```
+
+```text
+tdsh run ~/check.tdsh           # run and wait; $? is its status
+tdsh run ~/tools                # a folder runs its main.tdsh
+tdsh run ~/logger.tdsh --bg     # in the background
+```
+
+A script runs in a copy of the session, so its variables and `cd` do not
+leak back. On the ESP32 each user's `~/.tdshrc.tdsh` runs when their local
+console starts (for example `wificonnect`). The full reference, with every
+condition form, the limits and a tested example: `docs/SCRIPTING.md`.
+`tests/scripts/` holds self-checking test scripts.
+
 ## Documentation
 
 | File | Content |
 | --- | --- |
+| `docs/SCRIPTING.md` | the `.tdsh` script language: syntax, conditions, loops, functions, pipes, limits |
 | `docs/FUNCTIONS.md` | API and command inventory |
 | `docs/ARCHITECTURE.md`, `docs/PORTING.md` | structure, porting to another platform |
 | `docs/DEPENDENCIES.md` | component versions |
