@@ -15,3 +15,6 @@ board.conf
 __pycache__/
 .vscode/
 .idea/
+
+# make_release.py output
+dist/

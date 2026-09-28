@@ -1,13 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-09-28): first release
 
+### Releases and documentation
+
+* Releases: a tag `v<VERSION>` builds the ESP32-C6 and ESP32 firmware and the
+  Linux program and attaches them to a draft pre-release
+  (`.github/workflows/release.yml`, packaged by `tools/make_release.py` with
+  the same file names as TinyDesk's Shell edition). The README links the web
+  installer.
 * Documentation: `docs/SCRIPTING.md`, the reference for `.tdsh` scripts
   (running them, variables and quoting, `$(…)` and `$((…))`, conditions,
   loops, functions, pipes and redirection, limits, a tested example), and
   a Scripts section in the README.
-
-## 0.1.0 (2026-09-26): first release
 
 ### Name, licence, layout
 

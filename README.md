@@ -25,9 +25,22 @@ terminal desktop for microcontrollers, and works on its own too.
 
 The C API uses the prefix `tdsh_` (`tdsh.h`, `tdsh_espidf.h`); scripts end in `.tdsh`.
 
-## Get the source
+## Install without building
 
-This is a developer preview. The public web installer is not available yet.
+This is a developer preview.
+
+* **From the browser:** the [TinyDesk web installer](https://schikani.github.io/tinydesk-docs/install/#shell/esp32c6)
+  flashes TinyDesk Shell onto an ESP32-C6 or ESP32 (Chrome or Edge), and the
+  [web terminal](https://schikani.github.io/tinydesk-docs/console/) opens the board afterwards.
+* **Files:** every [release](https://github.com/schikani/tinydesk-shell/releases) has a factory image
+  per board (flash at offset 0 with esptool), the Linux program and `SHA256SUMS.txt`.
+
+A release is made by pushing a tag `v<VERSION>`: `.github/workflows/release.yml`
+runs the host tests, builds both firmware projects and the Linux program, and
+creates a draft pre-release with the files (`tools/make_release.py` packages
+them; it runs locally too).
+
+## Get the source
 
 ```bash
 git clone https://github.com/schikani/tinydesk-shell.git

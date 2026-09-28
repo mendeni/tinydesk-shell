@@ -1,0 +1,88 @@
+name: release
+
+# A tag v<version> (matching the VERSION file) builds TinyDesk Shell for the
+# ESP32-C6, the classic ESP32 and Linux, and attaches the files to a draft
+# pre-release: factory images (esptool at 0x0), ESP Web Tools manifests,
+# the Linux program, SHA256SUMS.txt and README.txt. Review the draft on
+# GitHub, then publish it.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  checks:
+    uses: ./.github/workflows/host.yml
+
+  host-linux:
+    needs: checks
+    runs-on: ubuntu-22.04          # an older glibc: the program runs on more distributions
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test the host program
+        run: |
+          sudo apt-get install -y ninja-build
+          cmake -S . -B build-host -G Ninja -DTDSH_BUILD_HOST=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host
+          ctest --test-dir build-host --output-on-failure --no-tests=error
+          strip build-host/tdsh_host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-linux
+          path: build-host/tdsh_host
+
+  release:
+    needs: host-linux
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.3.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          want="v$(head -n1 VERSION | tr -d '[:space:]')"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match VERSION ($want)"; exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: host-linux
+          path: host
+      - name: Build the firmware (ESP32-C6, ESP32)
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py build
+          (cd projects/esp32 && idf.py build)
+      - name: Package
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          chmod +x host/tdsh_host
+          python tools/make_release.py --host-linux host/tdsh_host
+          echo "VERSION=$(head -n1 VERSION | tr -d '[:space:]')" >> "$GITHUB_ENV"
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          body_path: RELEASE_NOTES.md
+          name: TinyDesk Shell ${{ env.VERSION }}
+          files: |
+            dist/tinydesk-shell-${{ env.VERSION }}/*.bin
+            dist/tinydesk-shell-${{ env.VERSION }}/*.tar.gz
+            dist/tinydesk-shell-${{ env.VERSION }}/manifest-*.json
+            dist/tinydesk-shell-${{ env.VERSION }}/SHA256SUMS.txt
+            dist/tinydesk-shell-${{ env.VERSION }}/README.txt
+      - name: Keep the files of a manual run
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinydesk-shell-${{ env.VERSION }}
+          path: dist/tinydesk-shell-${{ env.VERSION }}
