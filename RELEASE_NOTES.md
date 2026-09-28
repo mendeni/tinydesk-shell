@@ -7,13 +7,19 @@ also runs on a PC. It is the shell inside
 This release is a developer preview: expect rough edges, and please report
 what breaks.
 
-## New in 0.1.1
+## New in 0.1.2
 
-* **Windows program:** `tinydesk-shell-windows-x64.zip` has `tdsh.exe`, the
-  shell as a native Windows console program for Windows Terminal (line
-  editing, history, Tab completion, `ifconfig`, `ping`). Its files live in
-  `%LOCALAPPDATA%\tdsh\rootfs`, apart from yours.
-* The release text shows the real version numbers.
+* **SD card at `/sd`:** `sd mount`, `sd umount`, `sd status` and
+  `sd format --yes` (root) mount a FAT card on the SPI bus. It is `/sd` in
+  the shell, `nano`, FTP and SFTP; long file names work.
+  `board set sd.automount 1` mounts it at every boot. The release firmware
+  has no pins built in: set them once with `board set sd.cs <gpio>` (the
+  card shares the W6100's `eth.*` bus) or also `sd.miso`, `sd.mosi` and
+  `sd.sclk`, then restart.
+* **`ping -c <count>`** on the boards, as on Windows and Linux.
+
+Also since 0.1.0: `tdsh.exe`, a native Windows program
+(`tinydesk-shell-windows-x64.zip`, files in `%LOCALAPPDATA%\tdsh\rootfs`).
 
 ## Install
 

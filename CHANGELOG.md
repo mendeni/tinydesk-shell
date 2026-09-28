@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 (2026-09-28)
 
 * **SD card at `/sd`** (`tdsh_sdcard.c`, command `sd`, root only): `sd
   mount | umount | format --yes | status` mounts a FAT card on the SPI bus
