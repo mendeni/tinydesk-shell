@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-09-28)
 
 * **Windows program `tdsh.exe`** (`ports/windows`, `examples/windows`): the
   shell as a native Windows console program, for Windows Terminal. The line

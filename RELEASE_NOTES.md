@@ -7,6 +7,14 @@ also runs on a PC. It is the shell inside
 This release is a developer preview: expect rough edges, and please report
 what breaks.
 
+## New in 0.1.1
+
+* **Windows program:** `tinydesk-shell-windows-x64.zip` has `tdsh.exe`, the
+  shell as a native Windows console program for Windows Terminal (line
+  editing, history, Tab completion, `ifconfig`, `ping`). Its files live in
+  `%LOCALAPPDATA%\tdsh\rootfs`, apart from yours.
+* The release text shows the real version numbers.
+
 ## Install
 
 * **ESP boards, from the browser:** <https://schikani.github.io/tinydesk-docs/install/#shell/esp32c6>
