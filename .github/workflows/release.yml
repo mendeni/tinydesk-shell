@@ -65,14 +65,18 @@ jobs:
           . $IDF_PATH/export.sh
           chmod +x host/tdsh_host
           python tools/make_release.py --host-linux host/tdsh_host
-          echo "VERSION=$(head -n1 VERSION | tr -d '[:space:]')" >> "$GITHUB_ENV"
+          version="$(head -n1 VERSION | tr -d '[:space:]')"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          # The release text: RELEASE_NOTES.md with {version} filled in.
+          sed "s/{version}/$version/g" RELEASE_NOTES.md > dist/release-notes.md
+          if grep -q "{version}" dist/release-notes.md; then echo "::error::{version} left in the notes"; exit 1; fi
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           prerelease: true
-          body_path: RELEASE_NOTES.md
+          body_path: dist/release-notes.md
           name: TinyDesk Shell ${{ env.VERSION }}
           files: |
             dist/tinydesk-shell-${{ env.VERSION }}/*.bin

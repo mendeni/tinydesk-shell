@@ -14,8 +14,8 @@ what breaks.
 * **Without the browser:** flash a `*-factory.bin` below at offset 0:
 
   ```bash
-  esptool.py --chip esp32c6 write_flash 0x0 tinydesk-shell-VERSION-esp32c6-factory.bin
-  esptool.py --chip esp32 write_flash 0x0 tinydesk-shell-VERSION-esp32-factory.bin
+  esptool.py --chip esp32c6 write_flash 0x0 tinydesk-shell-{version}-esp32c6-factory.bin
+  esptool.py --chip esp32 write_flash 0x0 tinydesk-shell-{version}-esp32-factory.bin
   ```
 
 * **Linux (x86_64, built on Ubuntu 22.04):** `tinydesk-shell-linux-x86_64.tar.gz`,
@@ -23,8 +23,8 @@ what breaks.
 
 | File | Board |
 | --- | --- |
-| `tinydesk-shell-VERSION-esp32c6-factory.bin` | ESP32-C6 with 8 MB flash, built-in USB |
-| `tinydesk-shell-VERSION-esp32-factory.bin` | any ESP32 with 4 MB flash or more; PSRAM is used when present |
+| `tinydesk-shell-{version}-esp32c6-factory.bin` | ESP32-C6 with 8 MB flash, built-in USB |
+| `tinydesk-shell-{version}-esp32-factory.bin` | any ESP32 with 4 MB flash or more; PSRAM is used when present |
 
 Check the files against `SHA256SUMS.txt`. The firmware is not signed. A
 factory image erases users, Wi-Fi networks and the SSH host key.
