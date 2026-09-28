@@ -204,7 +204,7 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv);
 | network | network [status] \| network mode [auto\|lan\|wifi\|both] \| network autowifi [on\|off] | Configure network policy |
 | netmount | netmount <list\|add\|connect\|disconnect\|status\|remove> ... | Map SMB2/SMB3 shares |
 | ifconfig | ifconfig | Show network interfaces and default route |
-| ping | ping <host/address ...> | Send ICMP echo requests |
+| ping | ping [-c count] <host/address ...> | Send ICMP echo requests (4 per host unless -c) |
 | ftp | ftp <start\|stop\|restart\|status> [port] | Control FTP server |
 | ssh | ssh <start\|stop\|restart\|status> [port] | Control SSH/SFTP server |
 | write | write <file> [text ...] | Line editor or direct file writer |

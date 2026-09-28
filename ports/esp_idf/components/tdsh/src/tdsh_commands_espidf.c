@@ -216,7 +216,7 @@ static const tdsh_command_t s_network_commands[] = {
     {"network",        "network [status] | network mode [auto|lan|wifi|both] | network autowifi [on|off]", "Configure network policy", tdsh_cmd_network, 0},
     {"netmount",       "netmount <list|add|connect|disconnect|status|remove> ...", "Map SMB2/SMB3 shares", tdsh_cmd_netmount, 0},
     {"ifconfig",       "ifconfig", "Show network interfaces and default route", tdsh_cmd_ifconfig, 0},
-    {"ping",           "ping <host/address ...>", "Send ICMP echo requests", tdsh_cmd_ping, 0},
+    {"ping",           "ping [-c count] <host/address ...>", "Send ICMP echo requests", tdsh_cmd_ping, 0},
 };
 
 static const tdsh_command_t s_remote_server_commands[] = {

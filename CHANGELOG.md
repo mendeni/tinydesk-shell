@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+* **`ping -c <count>` on the boards** (1 to 100 requests per host, 4 by
+  default), like the Windows and Linux programs; `ping -c` without a count
+  shows the usage. The Linux program passes its default `-c 4` only when no
+  `-c` is given.
+* **`ping` output from a redirected session:** the replies and statistics
+  were printed from ESP-IDF's ping task, so in TinyDesk's Terminal window
+  only the first line appeared. The ping task now queues its lines and the
+  session prints them.
+* README: keep the checkout in a short folder on Windows (ESP-IDF's nested
+  build folders pass the 260-character path limit).
+
 ## 0.1.1 (2026-09-28)
 
 * **Windows program `tdsh.exe`** (`ports/windows`, `examples/windows`): the

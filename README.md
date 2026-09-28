@@ -66,7 +66,10 @@ idf.py -p PORT flash monitor
 ```
 
 On Windows, `build_windows.cmd` runs an environment check first
-(`build_windows.cmd -p COM7 flash monitor`). The ESP-IDF component manager
+(`build_windows.cmd -p COM7 flash monitor`). Keep the checkout in a short
+folder such as `C:\src\tinydesk-shell`: ESP-IDF's nested build folders
+otherwise run past Windows' 260-character path limit (`ninja: error:
+mkdir(...): No such file or directory`). The ESP-IDF component manager
 downloads the dependencies declared in
 `ports/esp_idf/components/tdsh/idf_component.yml`.
 
