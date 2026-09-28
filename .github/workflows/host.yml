@@ -19,3 +19,15 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1
         run: ctest --test-dir build-asan --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tdsh.exe (MinGW) and run its tests
+        shell: bash
+        run: |
+          choco install ninja -y
+          cmake -S . -B build-win -G Ninja -DCMAKE_C_COMPILER=gcc -DTDSH_BUILD_HOST=ON
+          cmake --build build-win
+          ctest --test-dir build-win --output-on-failure --no-tests=error

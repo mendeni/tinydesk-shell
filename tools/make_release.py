@@ -11,12 +11,14 @@ of files a GitHub release carries:
         tinydesk-shell-<version>-<board>-factory.bin   esptool, offset 0x0
         manifest-shell-<board>.json                   ESP Web Tools, one per board
         tinydesk-shell-linux-x86_64.tar.gz            with --host-linux
+        tinydesk-shell-windows-x64.zip                with --host-windows
         SHA256SUMS.txt, README.txt
 
 The names match the Shell edition files of a TinyDesk release, so the TinyDesk
 web installer can use either.
 
-    python tools/make_release.py [--build-dir build] [--host-linux build-host/tdsh_host] [--out dist]
+    python tools/make_release.py [--build-dir build] [--host-linux build-host/tdsh_host]
+                                 [--host-windows build-host/tdsh_host.exe] [--out dist]
                                  [--allow-board-conf]
 
 Needs esptool (in the ESP-IDF Python environment; `pip install esptool`
@@ -32,6 +34,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TITLE = "TinyDesk Shell"
@@ -84,6 +87,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--build-dir", default="build", help="build folder inside each project")
     ap.add_argument("--host-linux", help="the Linux host program (build-host/tdsh_host)")
+    ap.add_argument("--host-windows", help="the Windows program (build-host/tdsh_host.exe, MinGW, static)")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--allow-board-conf", action="store_true",
                     help="package images built with a board.conf (private use only)")
@@ -160,6 +164,23 @@ def main():
             t.add(os.path.join(ROOT, "LICENSE"), name + "/LICENSE")
         readme += ["", "PC program: %s.tar.gz (README.txt inside)." % name]
         print("host     %s.tar.gz" % name)
+
+    if args.host_windows:
+        if not os.path.exists(args.host_windows):
+            sys.exit("no such program: %s" % args.host_windows)
+        name = "tinydesk-shell-windows-x64"
+        notes = ("%s %s for Windows (x64)\r\n\r\n"
+                 "Start tdsh.exe in Windows Terminal (or any console window):\r\n\r\n"
+                 "  .\\tdsh.exe\r\n\r\n"
+                 "Its files live in %%LOCALAPPDATA%%\\tdsh\\rootfs (your real files are not used).\r\n"
+                 "Type 'help' for the commands, 'exit' to leave.\r\n" % (TITLE, version))
+        path = os.path.join(out, name + ".zip")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            z.write(args.host_windows, name + "/tdsh.exe")
+            z.writestr(name + "/README.txt", notes)
+            z.write(os.path.join(ROOT, "LICENSE"), name + "/LICENSE")
+        readme += ["", "PC program: %s.zip (README.txt inside)." % name]
+        print("host     %s.zip" % name)
 
     with open(os.path.join(out, "README.txt"), "w") as f:
         f.write("\n".join(readme) + "\n")

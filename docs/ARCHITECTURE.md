@@ -13,11 +13,11 @@ Application / Product (product, gateway, test fixture, ...)
              |
              | tdsh_platform_api_t
              v
-+----------------------+   +---------------------+
-| ESP-IDF port         |   | POSIX host port     |
-| FreeRTOS, USB, NVS,  |   | pthread, host fs    |
-| LittleFS, network... |   | CI/tests            |
-+----------------------+   +---------------------+
++----------------------+   +---------------------+   +---------------------+
+| ESP-IDF port         |   | POSIX host port     |   | Windows host port   |
+| FreeRTOS, USB, NVS,  |   | pthread, host fs    |   | Win32 console,      |
+| LittleFS, network... |   | CI/tests            |   | host fs, tdsh.exe   |
++----------------------+   +---------------------+   +---------------------+
 ```
 
 ## Portable-core rule

@@ -21,7 +21,8 @@ terminal desktop for microcontrollers, and works on its own too.
 * **Board configuration**: pins for RS-485, Ethernet and SD come from a
   `key = value` file (`board` command, `tdsh_board.h`), not from the code.
 * Hardware loopback tests (`hwtest`), heap and task information.
-* A portable core with a POSIX host port and regression tests.
+* A portable core with POSIX (Linux) and Windows host ports and regression
+  tests; `tdsh.exe` runs the shell natively on Windows.
 
 The C API uses the prefix `tdsh_` (`tdsh.h`, `tdsh_espidf.h`); scripts end in `.tdsh`.
 
@@ -33,10 +34,15 @@ This is a developer preview.
   flashes TinyDesk Shell onto an ESP32-C6 or ESP32 (Chrome or Edge), and the
   [web terminal](https://schikani.github.io/tinydesk-docs/console/) opens the board afterwards.
 * **Files:** every [release](https://github.com/schikani/tinydesk-shell/releases) has a factory image
-  per board (flash at offset 0 with esptool), the Linux program and `SHA256SUMS.txt`.
+  per board (flash at offset 0 with esptool), the Linux program, the Windows
+  program (`tdsh.exe`, run it in Windows Terminal) and `SHA256SUMS.txt`. On a
+  PC the shell keeps its files apart from yours: in
+  `~/.local/share/tdsh/rootfs` on Linux, `%LOCALAPPDATA%\tdsh\rootfs` on
+  Windows.
 
 A release is made by pushing a tag `v<VERSION>`: `.github/workflows/release.yml`
-runs the host tests, builds both firmware projects and the Linux program, and
+runs the host tests, builds both firmware projects and the Linux and Windows
+programs, and
 creates a draft pre-release with the files (`tools/make_release.py` packages
 them; it runs locally too).
 
@@ -121,7 +127,7 @@ An integration that shares this console with a remote transport must call
 connection if it returns false. This prevents remote use of physical password
 recovery; successful takeover revokes physical trust until reboot.
 
-## Host build and tests (Linux, WSL)
+## Host build and tests (Linux, WSL, Windows)
 
 ```bash
 cmake -S . -B build-host -G Ninja -DTDSH_BUILD_HOST=ON
@@ -129,7 +135,9 @@ cmake --build build-host
 ctest --test-dir build-host --output-on-failure
 ```
 
-`docs/POSIX_HOST.md` explains the host port's file layout.
+On Windows add `-DCMAKE_C_COMPILER=gcc` (MinGW-w64); the program is
+`build-host/tdsh_host.exe`. `docs/POSIX_HOST.md` and `docs/WINDOWS_HOST.md`
+explain the host ports.
 
 ## Scripts
 

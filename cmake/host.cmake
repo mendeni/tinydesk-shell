@@ -19,6 +19,60 @@ add_library(tdsh_core STATIC
 target_include_directories(tdsh_core PUBLIC include)
 target_compile_options(tdsh_core PRIVATE -Wall -Wextra -Wpedantic)
 
+if(WIN32)
+    # Windows (MinGW-w64, UCRT): the core expects newlib/glibc stdio; the
+    # compat layer adds per-thread stdin/stdout, funopen() and mkdir(path,
+    # mode). It is force-included everywhere except in its own source.
+    set(TDSH_WIN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ports/windows)
+    set(TDSH_WIN_COMPAT -include ${TDSH_WIN_DIR}/tdsh_win_compat.h)
+    add_library(tdsh_wincompat STATIC ${TDSH_WIN_DIR}/tdsh_win_compat.c)
+    target_include_directories(tdsh_wincompat PUBLIC ${TDSH_WIN_DIR})
+    target_compile_options(tdsh_core PRIVATE ${TDSH_WIN_COMPAT})
+    target_link_libraries(tdsh_core PUBLIC tdsh_wincompat)
+
+    add_library(tdsh_win STATIC
+        ${TDSH_WIN_DIR}/tdsh_platform_win.c
+        ${TDSH_WIN_DIR}/tdsh_win_commands.c
+        ${TDSH_WIN_DIR}/tdsh_win_console.c
+    )
+    target_include_directories(tdsh_win PUBLIC include ${TDSH_WIN_DIR})
+    target_compile_options(tdsh_win PRIVATE ${TDSH_WIN_COMPAT})
+    # ifconfig and ping use the IP Helper API.
+    target_link_libraries(tdsh_win PUBLIC tdsh_core iphlpapi ws2_32)
+
+    add_executable(tdsh_host examples/windows/main.c)
+    target_compile_options(tdsh_host PRIVATE ${TDSH_WIN_COMPAT})
+    target_link_libraries(tdsh_host PRIVATE tdsh_win)
+
+    if(TDSH_BUILD_TESTS)
+        enable_testing()
+        add_executable(tdsh_console_access_tests tests/test_console_access.c)
+        target_include_directories(tdsh_console_access_tests PRIVATE include)
+        add_test(NAME tdsh_console_access_tests COMMAND tdsh_console_access_tests)
+        add_executable(tdsh_board_tests tests/test_board.c)
+        target_compile_options(tdsh_board_tests PRIVATE ${TDSH_WIN_COMPAT})
+        target_link_libraries(tdsh_board_tests PRIVATE tdsh_core)
+        add_test(NAME tdsh_board_tests COMMAND tdsh_board_tests)
+        # The program itself, fed from a pipe, with its files in the build folder.
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/smoke_input.txt
+             "version
+echo sum=$((6 * 7))
+mkdir -p ~/t
+echo hi > ~/t/a.txt
+cat ~/t/a.txt
+exit
+")
+        add_test(NAME tdsh_windows_smoke
+                 COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:tdsh_host>
+                         -DINPUT=${CMAKE_CURRENT_BINARY_DIR}/smoke_input.txt
+                         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_with_input.cmake)
+        set_tests_properties(tdsh_windows_smoke PROPERTIES
+            ENVIRONMENT "LOCALAPPDATA=${CMAKE_CURRENT_BINARY_DIR}/appdata"
+            PASS_REGULAR_EXPRESSION "TinyDesk Shell [0-9.]+ [(]windows[)].*sum=42.*hi")
+    endif()
+    return()
+endif()
+
 if(TDSH_BUILD_POSIX)
     add_library(tdsh_posix STATIC
         ports/posix/tdsh_posix.c

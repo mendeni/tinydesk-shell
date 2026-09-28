@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+* **Windows program `tdsh.exe`** (`ports/windows`, `examples/windows`): the
+  shell as a native Windows console program, for Windows Terminal. The line
+  editor, history and Tab completion work as on Linux; `ifconfig`, `ping`,
+  `date`, `cal`, `tz`, `write`, `hostpath`, `capabilities`. Its files are
+  in `%LOCALAPPDATA%\tdsh\rootfs`, the user is the Windows user name.
+  `docs/WINDOWS_HOST.md` describes it.
+* The Windows port moved here from TinyDesk, which now uses it for its
+  Windows Terminal window; `tdsh_win_init_user()` sets the default user.
+* Releases also contain `tinydesk-shell-windows-x64.zip`; the host workflow
+  builds and tests on Windows (MinGW) too.
+* The release text takes its version from `VERSION` (`{version}` in
+  `RELEASE_NOTES.md`).
+
 ## 0.1.0 (2026-09-28): first release
 
 ### Releases and documentation

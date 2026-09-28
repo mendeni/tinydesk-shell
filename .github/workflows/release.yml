@@ -1,9 +1,9 @@
 name: release
 
 # A tag v<version> (matching the VERSION file) builds TinyDesk Shell for the
-# ESP32-C6, the classic ESP32 and Linux, and attaches the files to a draft
+# ESP32-C6, the classic ESP32, Linux and Windows, and attaches the files to a draft
 # pre-release: factory images (esptool at 0x0), ESP Web Tools manifests,
-# the Linux program, SHA256SUMS.txt and README.txt. Review the draft on
+# the Linux and Windows programs, SHA256SUMS.txt and README.txt. Review the draft on
 # GitHub, then publish it.
 
 on:
@@ -35,8 +35,27 @@ jobs:
           name: host-linux
           path: build-host/tdsh_host
 
+  host-windows:
+    needs: checks
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test tdsh.exe (MinGW, static)
+        shell: bash
+        run: |
+          choco install ninja -y
+          cmake -S . -B build-host -G Ninja -DCMAKE_C_COMPILER=gcc -DTDSH_BUILD_HOST=ON \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS=-static
+          cmake --build build-host
+          ctest --test-dir build-host --output-on-failure --no-tests=error
+          strip build-host/tdsh_host.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-windows
+          path: build-host/tdsh_host.exe
+
   release:
-    needs: host-linux
+    needs: [host-linux, host-windows]
     runs-on: ubuntu-latest
     container: espressif/idf:v5.3.1
     steps:
@@ -53,6 +72,10 @@ jobs:
         with:
           name: host-linux
           path: host
+      - uses: actions/download-artifact@v4
+        with:
+          name: host-windows
+          path: host
       - name: Build the firmware (ESP32-C6, ESP32)
         shell: bash
         run: |
@@ -64,7 +87,7 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           chmod +x host/tdsh_host
-          python tools/make_release.py --host-linux host/tdsh_host
+          python tools/make_release.py --host-linux host/tdsh_host --host-windows host/tdsh_host.exe
           version="$(head -n1 VERSION | tr -d '[:space:]')"
           echo "VERSION=$version" >> "$GITHUB_ENV"
           # The release text: RELEASE_NOTES.md with {version} filled in.
@@ -81,6 +104,7 @@ jobs:
           files: |
             dist/tinydesk-shell-${{ env.VERSION }}/*.bin
             dist/tinydesk-shell-${{ env.VERSION }}/*.tar.gz
+            dist/tinydesk-shell-${{ env.VERSION }}/*.zip
             dist/tinydesk-shell-${{ env.VERSION }}/manifest-*.json
             dist/tinydesk-shell-${{ env.VERSION }}/SHA256SUMS.txt
             dist/tinydesk-shell-${{ env.VERSION }}/README.txt

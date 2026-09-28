@@ -20,6 +20,8 @@ what breaks.
 
 * **Linux (x86_64, built on Ubuntu 22.04):** `tinydesk-shell-linux-x86_64.tar.gz`,
   then `./tdsh`. Its files live in `~/.local/share/tdsh/rootfs`.
+* **Windows (x64, Windows 10 or later):** `tinydesk-shell-windows-x64.zip`, then
+  `tdsh.exe` in Windows Terminal. Its files live in `%LOCALAPPDATA%\tdsh\rootfs`.
 
 | File | Board |
 | --- | --- |
