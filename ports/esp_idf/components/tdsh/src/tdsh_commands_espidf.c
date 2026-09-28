@@ -234,6 +234,7 @@ static const tdsh_command_t s_editor_commands[] = {
 static const tdsh_command_t s_hardware_commands[] = {
     {"gpio",   "gpio <init|get|set> ...", "Configure and control GPIO", cmd_gpio, TDSH_CMD_ROOT_ONLY},
     {"hwtest", "hwtest <status|sd|uart|rs485|all> [count]", "Board SD/UART/RS485 hardware tests", tdsh_cmd_hwtest, TDSH_CMD_ROOT_ONLY},
+    {"sd",     "sd [status] | sd mount | sd umount | sd format --yes", "SD card at /sd (FAT)", tdsh_cmd_sd, TDSH_CMD_ROOT_ONLY},
 };
 
 #define REG_GROUP(group) do { \

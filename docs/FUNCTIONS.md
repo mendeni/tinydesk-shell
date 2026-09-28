@@ -150,6 +150,7 @@ int tdsh_cmd_ssh(tdsh_session_t *session, int argc, char **argv);
 int tdsh_cmd_write(tdsh_session_t *session, int argc, char **argv);
 int tdsh_cmd_nano(tdsh_session_t *session, int argc, char **argv);
 int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv);
+int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv);
 ```
 
 ## Registered commands
@@ -211,6 +212,7 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv);
 | nano | nano <file> | Full-screen VT100 nano-style editor |
 | gpio | gpio <init\|get\|set> ... | Configure and control GPIO |
 | hwtest | hwtest <status\|sd\|uart\|rs485\|all> [count] | Board SD/UART/RS485 hardware tests |
+| sd | sd [status] \| sd mount \| sd umount \| sd format --yes | SD card at /sd (FAT) |
 
 `board` is the reference application command. All optional ESP command groups
 are enabled by the standalone application configuration.

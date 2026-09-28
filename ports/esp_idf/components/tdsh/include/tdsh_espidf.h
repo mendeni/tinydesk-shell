@@ -181,6 +181,18 @@ int tdsh_cmd_netmount(tdsh_session_t *session, int argc, char **argv);
 bool tdsh_netmount_translate_logical(const char *logical, char *real_out, size_t real_out_size);
 void tdsh_netmount_remove_owner(const char *owner);
 
+/* The SD card as /sd (FAT over SPI; pins from the board configuration).
+ * tdsh_sdcard_init() mounts it at boot when the board key sd.automount is 1.
+ * tdsh_sdcard_card() is the sdmmc_card_t (sdmmc_cmd.h), NULL while not mounted. */
+esp_err_t tdsh_sdcard_init(void);
+esp_err_t tdsh_sdcard_mount(void);
+esp_err_t tdsh_sdcard_unmount(void);
+bool tdsh_sdcard_configured(void);
+bool tdsh_sdcard_mounted(void);
+void *tdsh_sdcard_card(void);
+bool tdsh_sdcard_translate_logical(const char *logical, char *real_out, size_t real_out_size);
+int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv);
+
 /* Time / ping / network servers / editors / hardware test. */
 void tdsh_time_sync_start(void);
 /* automatic (SNTP) time can be switched off; the choice is

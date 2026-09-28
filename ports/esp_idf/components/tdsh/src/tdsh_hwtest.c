@@ -276,7 +276,16 @@ static esp_err_t hwtest_sd(void)
            HWTEST_SD_CS_GPIO,
            HWTEST_SD_MAX_FREQ_KHZ);
 
-    esp_err_t err = ensure_shared_spi_bus();
+    /* Mounted with `sd mount` (or at boot): test on it, leave it mounted. */
+    const bool premounted = tdsh_sdcard_mounted();
+    sdmmc_card_t *card = premounted ? (sdmmc_card_t *)tdsh_sdcard_card() : NULL;
+    esp_err_t err = ESP_OK;
+    if (premounted) {
+        HWTEST_DETAIL("  Card already mounted at %s (sd mount); testing on it\n", HWTEST_SD_MOUNT_POINT);
+        goto mounted;
+    }
+
+    err = ensure_shared_spi_bus();
     if (err != ESP_OK) {
         HWTEST_DETAIL("  SPI bus initialization failed: %s\n", esp_err_to_name(err));
         return err;
@@ -296,7 +305,6 @@ static esp_err_t hwtest_sd(void)
         .allocation_unit_size = 16 * 1024,
     };
 
-    sdmmc_card_t *card = NULL;
     err = esp_vfs_fat_sdspi_mount(HWTEST_SD_MOUNT_POINT,
                                   &host,
                                   &slot_cfg,
@@ -310,6 +318,7 @@ static esp_err_t hwtest_sd(void)
     }
 
     HWTEST_DETAIL("  Card mounted at %s\n", HWTEST_SD_MOUNT_POINT);
+mounted:
     if (!s_hwtest_quiet) {
         sdmmc_card_print_info(stdout, card);
     }
@@ -419,6 +428,10 @@ cleanup:
 
     if (unlink(HWTEST_SD_FILE) != 0 && errno != ENOENT) {
         HWTEST_DETAIL("  warning: could not remove test file: %s\n", strerror(errno));
+    }
+
+    if (premounted) {
+        return err;
     }
 
     esp_err_t unmount_err =

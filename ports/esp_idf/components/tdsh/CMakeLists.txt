@@ -20,6 +20,7 @@ idf_component_register(
         "src/tdsh_ethernet.c"
         "src/tdsh_network.c"
         "src/tdsh_netmount.c"
+        "src/tdsh_sdcard.c"
         "src/tdsh_time.c"
         "src/tdsh_ping.c"
         "src/tdsh_ftp.c"

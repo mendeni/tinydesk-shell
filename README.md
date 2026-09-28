@@ -17,7 +17,8 @@ terminal desktop for microcontrollers, and works on its own too.
   physical-console recovery.
 * Wi-Fi (per-user saved networks), W6100 Ethernet, LAN/Wi-Fi policy,
   `ping`, SNTP time, time zones.
-* SSH/SFTP server (wolfSSH, per-device host key), FTP server, SMB2/3 mounts.
+* SSH/SFTP server (wolfSSH, per-device host key), FTP server, SMB2/3 mounts,
+  the SD card at `/sd` (`sd mount`, FAT over SPI, optional mount at boot).
 * **Board configuration**: pins for RS-485, Ethernet and SD come from a
   `key = value` file (`board` command, `tdsh_board.h`), not from the code.
 * Hardware loopback tests (`hwtest`), heap and task information.

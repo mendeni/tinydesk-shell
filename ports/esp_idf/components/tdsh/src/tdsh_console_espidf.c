@@ -475,7 +475,8 @@ static bool espidf_translate_path(void *context,
                                   size_t real_out_size)
 {
     (void)context;
-    return tdsh_netmount_translate_logical(logical, real_out, real_out_size);
+    return tdsh_netmount_translate_logical(logical, real_out, real_out_size) ||
+           tdsh_sdcard_translate_logical(logical, real_out, real_out_size);
 }
 
 esp_err_t tdsh_espidf_init(const tdsh_espidf_config_t *config)
@@ -559,6 +560,9 @@ esp_err_t tdsh_espidf_init(const tdsh_espidf_config_t *config)
             return net_err;
         }
     }
+
+    /* The SD card (sd.automount = 1); a missing card is not an error. */
+    (void)tdsh_sdcard_init();
 
     s_initialized = true;
     return ESP_OK;

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+* **SD card at `/sd`** (`tdsh_sdcard.c`, command `sd`, root only): `sd
+  mount | umount | format --yes | status` mounts a FAT card on the SPI bus
+  (pins from the board configuration, shared with the W6100) in the VFS at
+  `/sd`, and the shell's `/sd` maps to it, so the shell, `nano`, FTP and
+  SFTP see it. `sd.automount = 1` mounts it at boot. `hwtest sd` tests on a
+  mounted card instead of mounting it a second time. FAT long file names in
+  UTF-8 are on in every ESP project (`sdkconfig.defaults`).
 * **`ping -c <count>` on the boards** (1 to 100 requests per host, 4 by
   default), like the Windows and Linux programs; `ping -c` without a count
   shows the usage. The Linux program passes its default `-c 4` only when no
