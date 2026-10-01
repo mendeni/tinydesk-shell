@@ -7,19 +7,18 @@ also runs on a PC. It is the shell inside
 This release is a developer preview: expect rough edges, and please report
 what breaks.
 
-## New in 0.1.2
+## New in 0.1.3
 
-* **SD card at `/sd`:** `sd mount`, `sd umount`, `sd status` and
-  `sd format --yes` (root) mount a FAT card on the SPI bus. It is `/sd` in
-  the shell, `nano`, FTP and SFTP; long file names work.
-  `board set sd.automount 1` mounts it at every boot. The release firmware
-  has no pins built in: set them once with `board set sd.cs <gpio>` (the
-  card shares the W6100's `eth.*` bus) or also `sd.miso`, `sd.mosi` and
-  `sd.sclk`, then restart.
-* **`ping -c <count>`** on the boards, as on Windows and Linux.
+* **nano fits the terminal:** it asks the terminal for its size, so its
+  status line (Ctrl+C shows the cursor position there) and help lines are
+  no longer cut off in a terminal smaller than 80x24. On the boards and in
+  the Linux program.
+* **The factory password is named:** while root still has it, `passwd`
+  says the old password is `TinyDesk` (capital T and D), and `ssh start`
+  and `ftp start` say so when they refuse to start.
 
-Also since 0.1.0: `tdsh.exe`, a native Windows program
-(`tinydesk-shell-windows-x64.zip`, files in `%LOCALAPPDATA%\tdsh\rootfs`).
+Also since 0.1.0: the SD card at `/sd` (`sd mount`, 0.1.2), `ping -c`, and
+`tdsh.exe`, a native Windows program (`tinydesk-shell-windows-x64.zip`).
 
 ## Install
 

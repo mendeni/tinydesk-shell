@@ -31,10 +31,10 @@
  */
 
 #define NANO_VERSION             "0.1"
-#define NANO_SCREEN_COLS         80U
-#define NANO_SCREEN_ROWS         24U
-#define NANO_TEXT_ROWS           20U
-#define NANO_TEXT_COLS           79U
+#define NANO_SCREEN_COLS         80U     /* widest screen used (line buffers) */
+#define NANO_DEFAULT_ROWS        24U     /* when the terminal does not say */
+#define NANO_MIN_ROWS            8U
+#define NANO_MAX_ROWS            100U
 
 /* Keep predictable headroom on the ESP32-C6 (no PSRAM required). */
 #define NANO_MAX_FILE_BYTES      (64U * 1024U)
@@ -80,7 +80,16 @@ typedef struct {
     char status[NANO_SCREEN_COLS + 1];
     char *kill_line;
     size_t kill_len;
+
+    unsigned rows;      /* screen: header, text, status line, two help lines */
+    unsigned cols;
 } nano_editor_t;
+
+/* The screen layout follows the terminal's size (a TinyDesk Terminal window
+ * is often smaller than 80x24). */
+static unsigned text_rows(const nano_editor_t *ed) { return ed->rows - 4U; }
+static unsigned text_cols(const nano_editor_t *ed) { return ed->cols - 1U; }
+static unsigned status_row(const nano_editor_t *ed) { return ed->rows - 2U; }
 
 static void term_move(unsigned row, unsigned col)
 {
@@ -348,13 +357,13 @@ static void editor_scroll(nano_editor_t *ed)
     if (ed->cx > ed->lines[ed->cy].len) ed->cx = ed->lines[ed->cy].len;
 
     if (ed->cy < ed->top) ed->top = ed->cy;
-    if (ed->cy >= ed->top + NANO_TEXT_ROWS) {
-        ed->top = ed->cy - NANO_TEXT_ROWS + 1U;
+    if (ed->cy >= ed->top + text_rows(ed)) {
+        ed->top = ed->cy - text_rows(ed) + 1U;
     }
 
     if (ed->cx < ed->left) ed->left = ed->cx;
-    if (ed->cx >= ed->left + NANO_TEXT_COLS) {
-        ed->left = ed->cx - NANO_TEXT_COLS + 1U;
+    if (ed->cx >= ed->left + text_cols(ed)) {
+        ed->left = ed->cx - text_cols(ed) + 1U;
     }
 }
 
@@ -392,11 +401,11 @@ static void editor_draw(nano_editor_t *ed)
              NANO_VERSION,
              ed->logical,
              modified_mark);
-    print_clipped(header, strlen(header), NANO_TEXT_COLS);
+    print_clipped(header, strlen(header), text_cols(ed));
     printf("\033[0m");
 
     /* File area. */
-    for (unsigned row = 0; row < NANO_TEXT_ROWS; ++row) {
+    for (unsigned row = 0; row < text_rows(ed); ++row) {
         term_move(2U + row, 1);
         term_clear_line();
 
@@ -410,12 +419,12 @@ static void editor_draw(nano_editor_t *ed)
         if (ed->left < line->len) {
             print_clipped(line->data + ed->left,
                           line->len - ed->left,
-                          NANO_TEXT_COLS);
+                          text_cols(ed));
         }
     }
 
     /* Status. */
-    term_move(22, 1);
+    term_move(status_row(ed), 1);
     term_clear_line();
     printf("\033[7m");
     char statline[NANO_SCREEN_COLS + 1];
@@ -429,20 +438,20 @@ static void editor_draw(nano_editor_t *ed)
                  (unsigned)(ed->cx + 1U),
                  ed->modified ? "Modified" : "Unmodified");
     }
-    print_clipped(statline, strlen(statline), NANO_TEXT_COLS);
+    print_clipped(statline, strlen(statline), text_cols(ed));
     printf("\033[0m");
 
-    term_move(23, 1);
+    term_move(ed->rows - 1U, 1);
     term_clear_line();
-    printf("^G Help  ^O Write Out  ^W Where Is  ^K Cut  ^U Paste");
-    term_move(24, 1);
+    { static const char help[] = "^G Help  ^O Write Out  ^W Where Is  ^K Cut  ^U Paste"; print_clipped(help, sizeof(help) - 1U, text_cols(ed)); }
+    term_move(ed->rows, 1);
     term_clear_line();
-    printf("^X Exit  ^C Cur Pos    ^L Refresh   Home/End PgUp/PgDn");
+    { static const char help[] = "^X Exit  ^C Cur Pos    ^L Refresh   Home/End PgUp/PgDn"; print_clipped(help, sizeof(help) - 1U, text_cols(ed)); }
 
     unsigned crow = 2U + (unsigned)(ed->cy - ed->top);
     unsigned ccol = 1U + (unsigned)(ed->cx - ed->left);
-    if (crow > 21U) crow = 21U;
-    if (ccol > NANO_TEXT_COLS) ccol = NANO_TEXT_COLS;
+    if (crow > ed->rows - 3U) crow = ed->rows - 3U;
+    if (ccol > text_cols(ed)) ccol = text_cols(ed);
 
     term_move(crow, ccol);
     printf("\033[?25h");
@@ -460,6 +469,41 @@ static int read_byte(void)
         return -1;
     }
     return c & 0xFF;
+}
+
+/* The terminal's size: put the cursor as far down and right as it goes and
+ * ask where it is (every VT terminal answers ESC[6n with ESC[row;colR).
+ * Without an answer nano keeps 80x24, and a key that arrives instead is
+ * given back. Columns beyond 80 are not used. */
+static void editor_query_size(nano_editor_t *ed)
+{
+    ed->rows = NANO_DEFAULT_ROWS;
+    ed->cols = NANO_SCREEN_COLS;
+    printf("\033[999;999H\033[6n");
+    fflush(stdout);
+
+    int c = read_byte();
+    if (c != 0x1B) {
+        if (c >= 0) ungetc(c, stdin);
+        return;
+    }
+    if (read_byte() != '[') return;
+    unsigned v[2] = { 0U, 0U };
+    int field = 0;
+    for (int n = 0; n < 12; ++n) {
+        int x = read_byte();
+        if (x >= '0' && x <= '9') {
+            if (v[field] < 10000U) v[field] = v[field] * 10U + (unsigned)(x - '0');
+        } else if (x == ';' && field == 0) {
+            field = 1;
+        } else if (x == 'R' && field == 1) {
+            if (v[0] >= NANO_MIN_ROWS) ed->rows = v[0] > NANO_MAX_ROWS ? NANO_MAX_ROWS : v[0];
+            if (v[1] >= 20U) ed->cols = v[1] > NANO_SCREEN_COLS ? NANO_SCREEN_COLS : v[1];
+            return;
+        } else {
+            return;
+        }
+    }
 }
 
 static int editor_read_key(void)
@@ -702,11 +746,11 @@ static void editor_move(nano_editor_t *ed, int key)
             ed->cx = ed->lines[ed->cy].len;
             break;
         case NKEY_PGUP:
-            if (ed->cy > NANO_TEXT_ROWS) ed->cy -= NANO_TEXT_ROWS;
+            if (ed->cy > text_rows(ed)) ed->cy -= text_rows(ed);
             else ed->cy = 0;
             break;
         case NKEY_PGDN:
-            ed->cy += NANO_TEXT_ROWS;
+            ed->cy += text_rows(ed);
             if (ed->cy >= ed->line_count) ed->cy = ed->line_count - 1U;
             break;
         default:
@@ -724,7 +768,7 @@ static int editor_prompt(nano_editor_t *ed, const char *prompt,
     out[0] = '\0';
 
     for (;;) {
-        term_move(22, 1);
+        term_move(status_row(ed), 1);
         term_clear_line();
         printf("\033[7m %.24s%s\033[0m", prompt ? prompt : "", out);
         fflush(stdout);
@@ -796,7 +840,7 @@ static bool editor_exit_prompt(nano_editor_t *ed)
     if (!ed->modified) return true;
 
     for (;;) {
-        term_move(22, 1);
+        term_move(status_row(ed), 1);
         term_clear_line();
         printf("\033[7m Save modified buffer?  Y Yes   N No   ^C Cancel \033[0m");
         fflush(stdout);
@@ -867,6 +911,7 @@ int tdsh_posix_nano_impl(tdsh_session_t *session, int argc, char **argv)
                    ? "File loaded"
                    : "New File");
 
+    editor_query_size(&ed);
     printf("\033[2J\033[H");
     editor_draw(&ed);
 

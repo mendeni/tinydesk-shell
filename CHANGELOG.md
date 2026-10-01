@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.3 (2026-10-01)
+
+* **nano follows the terminal's size** (asked with ESC[6n when it starts;
+  80x24 without an answer, at most 80 columns). It assumed 80x24, so in a
+  smaller terminal, such as a TinyDesk Terminal window, the status line
+  (where Ctrl+C shows the cursor position) and the help lines were cut off.
+  The help lines are clipped to the width. The Linux program's nano had
+  the same layout and gets the same change.
+* **The factory root password is named where it is needed:** `passwd`
+  says the old password is `TinyDesk` while root still has it, and the `ssh`
+  and `ftp` refusals name it (`TDSH_FACTORY_ROOT_PASSWORD` in
+  `tdsh_espidf.h`).
+
 ## 0.1.2 (2026-09-28)
 
 * **SD card at `/sd`** (`tdsh_sdcard.c`, command `sd`, root only): `sd

@@ -13,6 +13,8 @@ if(NOT IDF_TARGET STREQUAL "esp32c6")
     message(FATAL_ERROR "This project is for the ESP32-C6 (idf.py set-target esp32c6); the classic ESP32 one is projects/esp32.")
 endif()
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/VERSION" PROJECT_VER LIMIT_COUNT 1)
+# Configure again when VERSION changes (the version is read only then).
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/VERSION")
 set(TDSH_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}")
 list(APPEND EXTRA_COMPONENT_DIRS "${TDSH_SDK_ROOT}/ports/esp_idf/components")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

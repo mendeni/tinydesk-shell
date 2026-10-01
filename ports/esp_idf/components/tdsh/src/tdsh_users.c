@@ -26,7 +26,7 @@
 static const char *TAG = "tdsh-users";
 
 /* The factory password root gets on a fresh device (change it with passwd). */
-#define DEFAULT_ROOT_PASSWORD "TinyDesk"
+#define DEFAULT_ROOT_PASSWORD TDSH_FACTORY_ROOT_PASSWORD
 
 typedef struct {
     uint8_t used;
@@ -366,6 +366,10 @@ int tdsh_cmd_passwd(tdsh_session_t *session, int argc, char **argv)
     int idx = find_user(session->username);
     if (idx < 0) return 1;
     char oldp[129], p1[129], p2[129];
+    if (strcmp(session->username, "root") == 0 && tdsh_user_authenticate("root", DEFAULT_ROOT_PASSWORD)) {
+        printf("root still has the factory password, " DEFAULT_ROOT_PASSWORD
+               " (capital T and D): type it as the old password.\n");
+    }
     if (read_password("Old password: ", oldp, sizeof(oldp))) return 1;
     if (!tdsh_user_authenticate(session->username, oldp)) { printf("Incorrect old password.\n"); return 1; }
     if (read_password("New password: ", p1, sizeof(p1)) || read_password("Retype new password: ", p2, sizeof(p2))) return 1;

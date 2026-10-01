@@ -10,6 +10,8 @@ cmake_minimum_required(VERSION 3.16)
 set(IDF_TARGET "esp32" CACHE STRING "TinyDesk Shell firmware target")
 get_filename_component(TDSH_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 file(STRINGS "${TDSH_SDK_ROOT}/VERSION" PROJECT_VER LIMIT_COUNT 1)
+# Configure again when VERSION changes (the version is read only then).
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TDSH_SDK_ROOT}/VERSION")
 list(APPEND EXTRA_COMPONENT_DIRS "${TDSH_SDK_ROOT}/ports/esp_idf/components")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(tdsh_esp32)

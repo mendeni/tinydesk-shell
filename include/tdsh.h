@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define TDSH_VERSION                  "0.1.2"
+#define TDSH_VERSION                  "0.1.3"
 #define USCRIPT_VERSION                 "1.1.1"
 
 #define TDSH_MAX_LINE                 512

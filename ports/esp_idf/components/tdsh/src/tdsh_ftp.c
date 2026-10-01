@@ -768,7 +768,8 @@ static void reset_client_slots(void)
 static int ftp_start(uint16_t port)
 {
     if (!tdsh_remote_access_ready()) {
-        printf("ftp: change the factory root password with passwd first\n");
+        printf("ftp: change the factory root password with passwd first (old password: "
+               TDSH_FACTORY_ROOT_PASSWORD ")\n");
         return 1;
     }
     if (s_running) {
