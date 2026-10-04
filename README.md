@@ -185,6 +185,14 @@ console starts (for example `wificonnect`). The full reference, with every
 condition form, the limits and a tested example: `docs/SCRIPTING.md`.
 `tests/scripts/` holds self-checking test scripts.
 
+## Community ports
+
+Maintained by their authors, not built or tested here:
+
+| Port | Platform | Notes |
+| --- | --- | --- |
+| [TinyTang](https://github.com/aquasock/TinyTang) by [@aquasock](https://github.com/aquasock) | BL616 (FreeRTOS), Sipeed Tang Console 138K | Shell over USB CDC with the SD card as filesystem; adds commands to load FPGA cores and ROMs, mirror the session to the core's on-screen display, and self-update the firmware |
+
 ## Documentation
 
 | File | Content |
