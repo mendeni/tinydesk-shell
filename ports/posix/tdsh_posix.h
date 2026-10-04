@@ -5,20 +5,19 @@
 #include "tdsh.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-    typedef struct
-    {
-        const char *hostname;
-        const char *default_user;
-        const char *fs_root;
-        const char *host_home;
-        bool map_default_user_home_to_host_home;
-        bool register_core_builtins;
-        bool register_posix_commands;
-    } tdsh_posix_config_t;
+typedef struct
+{
+    const char *hostname;
+    const char *default_user;
+    const char *fs_root;
+    const char *host_home;
+    bool map_default_user_home_to_host_home;
+    bool register_core_builtins;
+    bool register_posix_commands;
+} tdsh_posix_config_t;
 
 #define TDSH_POSIX_CONFIG_DEFAULT()                  \
     {                                                \
@@ -31,11 +30,11 @@ extern "C"
         .register_posix_commands = true,             \
     }
 
-    int tdsh_posix_init(const tdsh_posix_config_t *config);
-    int tdsh_posix_run_interactive(void);
-    int tdsh_posix_register_commands(void);
-    const char *tdsh_posix_real_fs_root(void);
-    const tdsh_platform_api_t *tdsh_posix_platform(void);
+int tdsh_posix_init(const tdsh_posix_config_t *config);
+int tdsh_posix_run_interactive(void);
+int tdsh_posix_register_commands(void);
+const char *tdsh_posix_real_fs_root(void);
+const tdsh_platform_api_t *tdsh_posix_platform(void);
 
 #ifdef __cplusplus
 }
