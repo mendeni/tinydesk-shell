@@ -11,7 +11,8 @@ terminal desktop for microcontrollers, and works on its own too.
 
 * Parser with variables, quoting, redirection, pipelines, command
   substitution, arithmetic and conditions; scripts (`.tdsh`, uScript 1.1.1).
-* Line editor: Tab completion, history, arrows, Home/End, Ctrl+A/E/U/K/L/C.
+* Line editor: Tab completion, history, arrows, Home/End, Ctrl+A/E/U/K/L/C;
+  long lines wrap over several rows and stay editable.
 * Files on LittleFS (`/fs`), `nano`, `write`; per-user homes with a sandbox.
 * Users in NVS with salted, hashed passwords; `login`, `passwd`, boot user,
   physical-console recovery.

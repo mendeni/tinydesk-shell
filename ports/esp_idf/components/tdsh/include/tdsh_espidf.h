@@ -61,6 +61,13 @@ void tdsh_espidf_run_console(void);
  * console's current user (changes with login / logout too). */
 void tdsh_espidf_console_set_user(const char *username);
 const char *tdsh_espidf_console_user(void);
+
+/* The local console's width in columns, for the line editor: a function
+ * that returns it (<= 0 if unknown), or NULL. Front ends that know their
+ * terminal's size (TinyDesk's Terminal window) set it; without it the
+ * editor asks a serial terminal (ESC[6n) and falls back to 80 columns.
+ * SSH sessions use the width from the client's pty request. */
+void tdsh_espidf_set_console_columns(int (*columns)(void));
 const tdsh_platform_api_t *tdsh_espidf_platform(void);
 int tdsh_espidf_register_commands(const tdsh_espidf_config_t *config);
 
@@ -233,6 +240,8 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv);
  * responsible for deciding who may do this). */
 bool tdsh_ssh_is_running(uint16_t *port, int *clients);
 int tdsh_ssh_set_running(bool on);
+/* The SSH client's terminal width from its pty request, 0 if none. */
+int tdsh_ssh_terminal_columns(void);
 bool tdsh_ftp_is_running(uint16_t *port);
 int tdsh_ftp_set_running(bool on);
 

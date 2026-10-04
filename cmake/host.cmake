@@ -53,6 +53,10 @@ if(WIN32)
         target_compile_options(tdsh_board_tests PRIVATE ${TDSH_WIN_COMPAT})
         target_link_libraries(tdsh_board_tests PRIVATE tdsh_core)
         add_test(NAME tdsh_board_tests COMMAND tdsh_board_tests)
+        add_executable(tdsh_terminal_wrap_tests tests/test_terminal_wrap.c)
+        target_compile_options(tdsh_terminal_wrap_tests PRIVATE ${TDSH_WIN_COMPAT} -Wall -Wextra -Wpedantic)
+        target_link_libraries(tdsh_terminal_wrap_tests PRIVATE tdsh_core)
+        add_test(NAME tdsh_terminal_wrap_tests COMMAND tdsh_terminal_wrap_tests)
         # The program itself, fed from a pipe, with its files in the build folder.
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/smoke_input.txt
              "version
@@ -115,6 +119,11 @@ if(TDSH_BUILD_TESTS)
     target_include_directories(tdsh_terminal_editor_tests PRIVATE ports/posix)
     target_link_libraries(tdsh_terminal_editor_tests PRIVATE tdsh_posix)
     add_test(NAME tdsh_terminal_editor_tests COMMAND tdsh_terminal_editor_tests)
+
+    add_executable(tdsh_terminal_wrap_tests tests/test_terminal_wrap.c)
+    target_compile_options(tdsh_terminal_wrap_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(tdsh_terminal_wrap_tests PRIVATE tdsh_core)
+    add_test(NAME tdsh_terminal_wrap_tests COMMAND tdsh_terminal_wrap_tests)
 
     add_executable(tdsh_full_uscript_tests tests/test_full_uscript.c)
     target_include_directories(tdsh_full_uscript_tests PRIVATE ports/posix)

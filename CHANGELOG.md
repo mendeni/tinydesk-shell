@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+* **Long command lines:** a line longer than the terminal is wide wraps
+  over several rows, and typing, Backspace, Delete, the arrows, Home/End
+  and history redraw it correctly; before, the earlier rows were never
+  cleared, so text was left behind or doubled, and the cursor could not
+  move back across the wrap. Columns are counted in UTF-8 characters, not
+  bytes. The width comes from the transport (`columns()` in
+  `tdsh_terminal_io_t`: TIOCGWINSZ, the Windows console, the SSH pty,
+  `tdsh_espidf_set_console_columns()`), else the terminal is asked once
+  per line (`read_byte_timeout()`, ESC[6n), else 80.
 * **Code style:** the C sources are formatted with `clang-format`
   (`.clang-format` in the repository root): braces on their own lines, one
   statement per line. Layout only; the code is unchanged.

@@ -77,6 +77,16 @@ void tdsh_memory_get_stats(tdsh_memory_stats_t *stats);
 ## include/tdsh_terminal.h
 
 ```c
+typedef struct
+{
+    void *context;
+    int (*read_byte)(void *context, uint8_t *byte_out);
+    int (*write_bytes)(void *context, const void *data, size_t length);
+    int (*columns)(void *context);                 /* optional: width, <= 0 unknown */
+    int (*read_byte_timeout)(void *context, uint8_t *byte_out,
+                             unsigned timeout_ms);  /* optional: 0, -ETIMEDOUT, or cannot wait */
+} tdsh_terminal_io_t;
+
 int tdsh_terminal_readline(tdsh_session_t *session,
                              const tdsh_terminal_io_t *io,
                              const char *prompt,
@@ -96,6 +106,8 @@ esp_err_t tdsh_start(void);
 int tdsh_console_readline(const char *prompt, char *buf, size_t capacity, bool echo_input);
 int tdsh_interactive_readline(tdsh_session_t *session, const char *prompt, char *buf, size_t capacity);
 bool tdsh_is_local_console_task(void);
+void tdsh_espidf_set_console_columns(int (*columns)(void));
+int tdsh_ssh_terminal_columns(void);
 int tdsh_session_set_user(tdsh_session_t *session, const char *username);
 int tdsh_run_user_startup(tdsh_session_t *session);
 esp_err_t tdsh_fs_init(bool format_if_mount_failed);

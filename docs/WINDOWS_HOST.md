@@ -56,7 +56,7 @@ computer's, both in lower case with other characters than letters, digits,
 
 The line editor is the portable one (see [POSIX_HOST.md](POSIX_HOST.md)):
 Tab completion, Up/Down history (`~/.tdsh_history`), Left/Right, Home/End,
-Ctrl+A/E/U/K/L/C. The console is switched to VT input only while a line is
+Ctrl+A/E/U/K/L/C, and lines that wrap at the console's width. The console is switched to VT input only while a line is
 read and restored before a command runs. Input from a pipe or a file works
 too (Windows line ends are accepted). Colour is on unless `NO_COLOR` is set.
 

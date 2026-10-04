@@ -61,6 +61,9 @@ It supports:
 - Ctrl+A / Ctrl+E
 - Ctrl+U / Ctrl+K
 - Ctrl+L
+- lines longer than the terminal is wide: they wrap over several rows, and
+  editing anywhere in them redraws every row (the width comes from
+  `TIOCGWINSZ`; UTF-8 characters count as one column each)
 - Ctrl+C
 
 The POSIX port switches the TTY to raw mode only while reading a command line

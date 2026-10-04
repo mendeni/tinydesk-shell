@@ -126,6 +126,16 @@ static int console_write_bytes(void *context, const void *data, size_t length)
     return 0;
 }
 
+/* Lines wrap at the screen buffer's width (in Windows Terminal, the window's). */
+static int console_columns(void *context)
+{
+    (void)context;
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    if (!s_out || !GetConsoleScreenBufferInfo(s_out, &info))
+        return 0;
+    return info.dwSize.X;
+}
+
 static void raw_input(bool on)
 {
     if (!s_in_console)
@@ -185,6 +195,7 @@ int tdsh_win_run_interactive(tdsh_session_t *session)
         .context = NULL,
         .read_byte = console_read_byte,
         .write_bytes = console_write_bytes,
+        .columns = console_columns,
     };
     char line[TDSH_MAX_LINE + 2];
     char prompt[TDSH_MAX_PATH + TDSH_HOSTNAME_MAX + TDSH_USERNAME_MAX + 64];

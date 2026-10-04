@@ -9,7 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "esp_log.h"
@@ -152,24 +154,83 @@ static bool *transport_swallow_flag(void)
                                         : &s_remote_swallow_lf_after_cr;
 }
 
-/* Keep CRLF state shared with password/login input on the same transport. */
+/* CR LF and CR count as one Enter: true if `byte` is the LF to drop. Keeps
+ * the state shared with password/login input on the same transport. */
+static bool swallow_lf(uint8_t byte)
+{
+    bool *swallow = transport_swallow_flag();
+    if (*swallow)
+    {
+        *swallow = false;
+        if (byte == '\n')
+            return true;
+    }
+    if (byte == '\r')
+        *swallow = true;
+    return false;
+}
+
 static int terminal_read_byte(void *context, uint8_t *out)
 {
     (void)context;
-    bool *swallow = transport_swallow_flag();
     for (;;)
     {
         if (tdsh_task_read_char(out) != 0)
             return -EIO;
-        if (*swallow)
-        {
-            *swallow = false;
-            if (*out == '\n')
-                continue;
-        }
-        if (*out == '\r')
-            *swallow = true;
-        return 0;
+        if (!swallow_lf(*out))
+            return 0;
+    }
+}
+
+static int (*s_console_columns)(void);
+
+void tdsh_espidf_set_console_columns(int (*columns)(void))
+{
+    s_console_columns = columns;
+}
+
+static int terminal_columns(void *context)
+{
+    (void)context;
+    if (!tdsh_is_local_console_task())
+        return tdsh_ssh_terminal_columns();
+    return s_console_columns ? s_console_columns() : 0;
+}
+
+/* A byte from the local serial console within timeout_ms, so the line
+ * editor can ask the terminal for its width. SSH and a front end's own
+ * stream (fileno() < 0) cannot wait and say so. */
+static int terminal_read_byte_timeout(void *context, uint8_t *out, unsigned timeout_ms)
+{
+    (void)context;
+    if (!tdsh_is_local_console_task() || fileno(stdin) < 0)
+        return -ENOTSUP;
+    for (;;)
+    {
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+        /* The USB Serial/JTAG VFS has no select(); stdin is unbuffered and
+         * reads from the same driver, so read the driver with a timeout. */
+        if (usb_serial_jtag_read_bytes(out, 1, pdMS_TO_TICKS(timeout_ms)) <= 0)
+            return -ETIMEDOUT;
+#else
+        int fd = fileno(stdin);
+        fd_set readable;
+        FD_ZERO(&readable);
+        FD_SET(fd, &readable);
+        struct timeval tv = {
+            .tv_sec = (time_t)(timeout_ms / 1000U),
+            .tv_usec = (suseconds_t)((timeout_ms % 1000U) * 1000U),
+        };
+        int n = select(fd + 1, &readable, NULL, NULL, &tv);
+        if (n == 0)
+            return -ETIMEDOUT;
+        if (n < 0)
+            return -ENOTSUP;
+        if (tdsh_task_read_char(out) != 0)
+            return -EIO;
+#endif
+        if (!swallow_lf(*out))
+            return 0;
     }
 }
 
@@ -188,6 +249,8 @@ int tdsh_interactive_readline(tdsh_session_t *session, const char *prompt,
         .context = NULL,
         .read_byte = terminal_read_byte,
         .write_bytes = terminal_write_bytes,
+        .columns = terminal_columns,
+        .read_byte_timeout = terminal_read_byte_timeout,
     };
     return tdsh_terminal_readline(session, &io, prompt, buf, capacity);
 }

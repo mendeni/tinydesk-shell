@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <termios.h>
 #include <time.h>
@@ -386,6 +388,30 @@ static int posix_terminal_read_byte(void *context, uint8_t *byte_out)
     }
 }
 
+static int posix_terminal_columns(void *context)
+{
+    (void)context;
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0 || ws.ws_col == 0)
+        return 0;
+    return ws.ws_col;
+}
+
+static int posix_terminal_read_byte_timeout(void *context, uint8_t *byte_out, unsigned timeout_ms)
+{
+    struct pollfd p = {.fd = STDIN_FILENO, .events = POLLIN};
+    for (;;)
+    {
+        int n = poll(&p, 1, (int)timeout_ms);
+        if (n > 0)
+            return posix_terminal_read_byte(context, byte_out);
+        if (n == 0)
+            return -ETIMEDOUT;
+        if (errno != EINTR)
+            return -errno;
+    }
+}
+
 static int posix_terminal_write_bytes(void *context, const void *data, size_t length)
 {
     (void)context;
@@ -412,6 +438,8 @@ static int posix_readline(tdsh_session_t *session,
         .context = NULL,
         .read_byte = posix_terminal_read_byte,
         .write_bytes = posix_terminal_write_bytes,
+        .columns = posix_terminal_columns,
+        .read_byte_timeout = posix_terminal_read_byte_timeout,
     };
 
     struct termios previous;

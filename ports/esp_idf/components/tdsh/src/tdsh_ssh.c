@@ -380,6 +380,28 @@ static int client_count_get(void)
     return n;
 }
 
+/* The client's terminal width from its pty request (0: none yet). One SSH
+ * client at a time, so one value. The build does not handle window-change
+ * requests (no WOLFSSH_SHELL), so a resize takes effect at the next login. */
+static volatile int s_pty_columns;
+
+static int ssh_terminal_size(WOLFSSH *ssh, word32 columns, word32 rows,
+                             word32 width_px, word32 height_px, void *ctx)
+{
+    (void)ssh;
+    (void)rows;
+    (void)width_px;
+    (void)height_px;
+    (void)ctx;
+    s_pty_columns = columns > 0U && columns < 10000U ? (int)columns : 0;
+    return WS_SUCCESS;
+}
+
+int tdsh_ssh_terminal_columns(void)
+{
+    return s_pty_columns;
+}
+
 static int ssh_user_auth(byte authType, WS_UserAuthData *authData, void *ctx)
 {
     (void)ctx;
@@ -745,6 +767,8 @@ static void ssh_handle_client(int fd, const struct sockaddr_in *peer)
 
     wolfSSH_set_fd(ssh, fd);
     wolfSSH_SetUserAuthCtx(ssh, ssh);
+    s_pty_columns = 0;
+    wolfSSH_SetTerminalResizeCb(ssh, ssh_terminal_size);
 
     int ret = wolfSSH_accept(ssh);
     if (ret == WS_SFTP_COMPLETE)

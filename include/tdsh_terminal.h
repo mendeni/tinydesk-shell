@@ -15,6 +15,15 @@ typedef struct
     void *context;
     int (*read_byte)(void *context, uint8_t *byte_out);
     int (*write_bytes)(void *context, const void *data, size_t length);
+    /* Optional (NULL: not available). The terminal's width in columns, or
+     * <= 0 if it is not known; read once per line. */
+    int (*columns)(void *context);
+    /* Optional (NULL: not available). Like read_byte, but waits at most
+     * timeout_ms: 0 with a byte, -ETIMEDOUT without one, any other negative
+     * value if this transport cannot wait. Without columns, the editor uses
+     * it to ask the terminal for its width (ESC[6n); without either, it
+     * assumes 80 columns. */
+    int (*read_byte_timeout)(void *context, uint8_t *byte_out, unsigned timeout_ms);
 } tdsh_terminal_io_t;
 
 /* Portable VT100/ANSI line editor used by terminal transports.
@@ -30,6 +39,10 @@ typedef struct
  *   Ctrl+U/K       erase before/after cursor
  *   Ctrl+L         redraw/clear screen
  *   Ctrl+C         cancel current line
+ *
+ * A line longer than the terminal is wide wraps over several rows; every
+ * redraw clears and rewrites all of them. Columns are counted in UTF-8 code
+ * points (one cell each); escape sequences in the prompt take no columns.
  *
  * History is stored at ~/.tdsh_history through the normal TinyDesk Shell virtual
  * filesystem resolver, so it remains inside the configured sandbox.

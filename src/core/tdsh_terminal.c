@@ -171,17 +171,293 @@ static void history_append(tdsh_session_t *session, const char *line)
     history_trim(session);
 }
 
-static void redraw(const tdsh_terminal_io_t *io,
-                   const char *prompt,
-                   const char *buffer,
-                   size_t length,
-                   size_t cursor)
+/* ------------------------------------------------------------------
+ * Drawing a line that may wrap over several rows.
+ *
+ * The editor keeps what the last draw left on the screen: how many rows it
+ * used and the row the cursor is on (0 = the prompt's row). A redraw goes
+ * back up to the prompt's row, clears to the end of the screen and prints
+ * prompt and buffer again, then places the cursor. Columns are counted in
+ * UTF-8 code points, one cell each; escape sequences take none. The prompt
+ * is assumed to start in the first column.
+ *
+ * When the text ends exactly at the right margin, terminals keep the cursor
+ * on the last column until the next character arrives ("pending wrap"), so
+ * the editor moves it to the start of the next row itself (CR LF) and counts
+ * that row as used.
+ */
+
+#define TERM_DEFAULT_COLUMNS  80U
+#define TERM_MAX_COLUMNS      1000U
+#define TERM_QUERY_TIMEOUT_MS 200U
+#define TERM_PUSHBACK_MAX     128U
+
+typedef struct
 {
-    (void)io_puts(io, "\r\033[2K");
-    (void)io_puts(io, prompt ? prompt : "");
-    (void)io_write(io, buffer, length);
-    if (length > cursor)
-        (void)io_printf(io, "\033[%uD", (unsigned)(length - cursor));
+    const tdsh_terminal_io_t *io;
+    const char *prompt;
+    size_t prompt_cols;
+    size_t cols;       /* terminal width */
+    size_t rows;       /* rows the text on the screen uses, at least 1 */
+    size_t cursor_row; /* the cursor's row, counted from the prompt's row */
+    bool end_wrapped;  /* the text ends at the margin: its last row is empty */
+    /* Bytes read while waiting for the terminal's size reply that were not
+     * part of it (type-ahead); the editor reads them first. */
+    uint8_t pushback[TERM_PUSHBACK_MAX];
+    size_t pushback_len;
+    size_t pushback_pos;
+} edit_t;
+
+static bool utf8_continuation(uint8_t byte)
+{
+    return (byte & 0xC0U) == 0x80U;
+}
+
+/* Cells `text` takes: one per code point; escape sequences take none
+ * (CSI ... final byte, OSC ... BEL or ST, ESC + one byte). */
+static size_t text_columns(const char *text, size_t length)
+{
+    const uint8_t *s = (const uint8_t *)text;
+    size_t i = 0U;
+    size_t columns = 0U;
+    while (i < length)
+    {
+        uint8_t c = s[i];
+        if (c == 0x1BU)
+        {
+            i++;
+            if (i < length && s[i] == '[')
+            {
+                i++;
+                while (i < length && (s[i] < 0x40U || s[i] > 0x7EU))
+                    i++;
+                i++;
+            }
+            else if (i < length && s[i] == ']')
+            {
+                while (i < length && s[i] != 0x07U && !(s[i] == 0x1BU && i + 1U < length && s[i + 1U] == '\\'))
+                    i++;
+                i += (i < length && s[i] == 0x1BU) ? 2U : 1U;
+            }
+            else
+            {
+                i++;
+            }
+            continue;
+        }
+        if (c >= 0x20U && c != 0x7FU && !utf8_continuation(c))
+            columns++;
+        i++;
+    }
+    return columns;
+}
+
+static size_t prev_char(const char *buffer, size_t at)
+{
+    if (at == 0U)
+        return 0U;
+    at--;
+    while (at > 0U && utf8_continuation((uint8_t)buffer[at]))
+        at--;
+    return at;
+}
+
+static size_t next_char(const char *buffer, size_t length, size_t at)
+{
+    if (at >= length)
+        return length;
+    at++;
+    while (at < length && utf8_continuation((uint8_t)buffer[at]))
+        at++;
+    return at;
+}
+
+static void move_rows(const edit_t *e, size_t from, size_t to)
+{
+    if (to < from)
+        (void)io_printf(e->io, "\033[%uA", (unsigned)(from - to));
+    else if (to > from)
+        (void)io_printf(e->io, "\033[%uB", (unsigned)(to - from));
+}
+
+/* The cursor goes to cell `pos` of the line (prompt included). */
+static void place_cursor(edit_t *e, size_t pos)
+{
+    size_t row = pos / e->cols;
+    size_t col = pos % e->cols;
+    move_rows(e, e->cursor_row, row);
+    (void)io_puts(e->io, "\r");
+    if (col > 0U)
+        (void)io_printf(e->io, "\033[%uC", (unsigned)col);
+    e->cursor_row = row;
+}
+
+/* After printing text up to cell `total` from the start of the prompt's row,
+ * with the terminal's cursor right after it. */
+static void text_printed_to(edit_t *e, size_t total)
+{
+    e->end_wrapped = total > 0U && total % e->cols == 0U;
+    if (e->end_wrapped)
+        (void)io_puts(e->io, "\r\n");
+    e->cursor_row = total / e->cols;
+    e->rows = e->cursor_row + 1U;
+}
+
+static void refresh(edit_t *e, const char *buffer, size_t length, size_t cursor)
+{
+    move_rows(e, e->cursor_row, 0U);
+    (void)io_puts(e->io, "\r\033[J");
+    (void)io_puts(e->io, e->prompt);
+    (void)io_write(e->io, buffer, length);
+    text_printed_to(e, e->prompt_cols + text_columns(buffer, length));
+    place_cursor(e, e->prompt_cols + text_columns(buffer, cursor));
+}
+
+/* Move the cursor within the text without redrawing it. */
+static void move_cursor(edit_t *e, const char *buffer, size_t cursor)
+{
+    place_cursor(e, e->prompt_cols + text_columns(buffer, cursor));
+}
+
+/* Leave the line: the cursor goes to the start of the row below the text
+ * (output that follows starts there), and the next draw starts afresh. */
+static void leave_line(edit_t *e)
+{
+    move_rows(e, e->cursor_row, e->rows - 1U);
+    (void)io_puts(e->io, e->end_wrapped ? "\r" : "\r\n");
+    e->rows = 1U;
+    e->cursor_row = 0U;
+    e->end_wrapped = false;
+}
+
+static int edit_read(edit_t *e, uint8_t *out)
+{
+    if (e->pushback_pos < e->pushback_len)
+    {
+        *out = e->pushback[e->pushback_pos++];
+        return 0;
+    }
+    e->pushback_pos = e->pushback_len = 0U;
+    if (!e->io->read_byte)
+        return -EINVAL;
+    return e->io->read_byte(e->io->context, out);
+}
+
+static bool pushback_add(edit_t *e, const uint8_t *bytes, size_t count)
+{
+    if (e->pushback_len + count > sizeof(e->pushback))
+        return false;
+    memcpy(e->pushback + e->pushback_len, bytes, count);
+    e->pushback_len += count;
+    return true;
+}
+
+/* Wait for a cursor position report, ESC [ row ; col R. Other bytes that
+ * arrive meanwhile (keys typed ahead) are kept for the editor. */
+static bool read_position_report(edit_t *e, unsigned *col_out)
+{
+    const tdsh_terminal_io_t *io = e->io;
+    uint8_t seen[16];
+    size_t seen_len = 0U;
+    unsigned col = 0U;
+    int state = 0; /* 0 ESC, 1 '[', 2 row digits, 3 column digits */
+    for (;;)
+    {
+        uint8_t b = 0U;
+        if (io->read_byte_timeout(io->context, &b, TERM_QUERY_TIMEOUT_MS) != 0)
+        {
+            (void)pushback_add(e, seen, seen_len);
+            return false;
+        }
+        bool fits = (state == 0 && b == 0x1BU) || (state == 1 && b == '[') ||
+                    (state >= 2 && b >= '0' && b <= '9') || (state == 2 && b == ';') ||
+                    (state == 3 && b == 'R');
+        if (!fits || seen_len + 1U >= sizeof(seen))
+        {
+            /* Not a report: what was collected was typed. An ESC may start
+             * the report (or another key) again. */
+            if (!pushback_add(e, seen, seen_len))
+                return false;
+            seen_len = 0U;
+            state = 0;
+            col = 0U;
+            if (b != 0x1BU)
+            {
+                if (!pushback_add(e, &b, 1U))
+                    return false;
+                continue;
+            }
+        }
+        seen[seen_len++] = b;
+        if (state == 0)
+            state = 1;
+        else if (state == 1)
+            state = 2;
+        else if (b == ';')
+            state = 3;
+        else if (b == 'R')
+        {
+            *col_out = col;
+            return true;
+        }
+        else if (state == 3)
+            col = col * 10U + (unsigned)(b - '0');
+    }
+}
+
+/* The terminal's width: from the transport, else asked from the terminal
+ * (linenoise's method: report the column, go to the far right, report it
+ * again, go back), else 80. Nothing is asked when the transport cannot wait
+ * for an answer, so a terminal that never answers costs at most one wait,
+ * and no reply is left to be read as typing. A reply that comes after the
+ * wait reads as an unknown key sequence and is ignored. */
+static size_t terminal_columns(edit_t *e)
+{
+    const tdsh_terminal_io_t *io = e->io;
+    if (io->columns)
+    {
+        int c = io->columns(io->context);
+        if (c > 0)
+            return (size_t)c < TERM_MAX_COLUMNS ? (size_t)c : TERM_MAX_COLUMNS;
+    }
+    /* The width learned last time, for when the terminal is not asked. */
+    static size_t s_last_asked;
+    const size_t fallback = s_last_asked ? s_last_asked : TERM_DEFAULT_COLUMNS;
+    if (!io->read_byte_timeout)
+        return TERM_DEFAULT_COLUMNS;
+
+    /* Can this transport wait? A byte already waiting is type-ahead (a
+     * paste, say): then nothing is asked, so the answer cannot end up in
+     * the middle of it, and the bytes after the next Enter stay with the
+     * transport for the next line. */
+    uint8_t b = 0U;
+    int rc = io->read_byte_timeout(io->context, &b, 0U);
+    if (rc == 0)
+    {
+        (void)pushback_add(e, &b, 1U);
+        return fallback;
+    }
+    if (rc != -ETIMEDOUT)
+        return TERM_DEFAULT_COLUMNS;
+
+    unsigned start = 0U, right = 0U;
+    (void)io_puts(io, "\033[6n");
+    if (!read_position_report(e, &start) || start == 0U)
+        return fallback;
+    (void)io_puts(io, "\033[999C\033[6n");
+    bool answered = read_position_report(e, &right) && right > 0U;
+    if (answered && right > start)
+        (void)io_printf(io, "\033[%uD", right - start);
+    else if (!answered)
+    {
+        (void)io_puts(io, "\r");
+        if (start > 1U)
+            (void)io_printf(io, "\033[%uC", start - 1U);
+    }
+    if (!answered)
+        return fallback;
+    s_last_asked = right < TERM_MAX_COLUMNS ? right : TERM_MAX_COLUMNS;
+    return s_last_asked;
 }
 
 static int replace_token(char *buffer,
@@ -222,8 +498,7 @@ static size_t common_command_prefix(const char *const *names, size_t count)
     return common;
 }
 
-static void complete_command(const tdsh_terminal_io_t *io,
-                             const char *prompt,
+static void complete_command(edit_t *e,
                              char *buffer,
                              size_t capacity,
                              size_t *length,
@@ -233,7 +508,7 @@ static void complete_command(const tdsh_terminal_io_t *io,
 {
     if (*cursor != end)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -241,7 +516,7 @@ static void complete_command(const tdsh_terminal_io_t *io,
     size_t prefix_len = end - start;
     if (prefix_len >= sizeof(prefix))
     {
-        bell(io);
+        bell(e->io);
         return;
     }
     memcpy(prefix, buffer + start, prefix_len);
@@ -258,7 +533,7 @@ static void complete_command(const tdsh_terminal_io_t *io,
     }
     if (count == 0U)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -275,21 +550,21 @@ static void complete_command(const tdsh_terminal_io_t *io,
 
     if (replace_token(buffer, capacity, length, cursor, start, end, replacement) != 0)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
     if (count > 1U && common == prefix_len)
     {
-        (void)io_puts(io, "\r\n");
+        leave_line(e);
         for (size_t i = 0U; i < count; ++i)
         {
-            (void)io_printf(io, "%-18s", matches[i]);
+            (void)io_printf(e->io, "%-18s", matches[i]);
             if ((i + 1U) % 4U == 0U || i + 1U == count)
-                (void)io_puts(io, "\r\n");
+                (void)io_puts(e->io, "\r\n");
         }
     }
-    redraw(io, prompt, buffer, *length, *cursor);
+    refresh(e, buffer, *length, *cursor);
 }
 
 static size_t common_prefix_pair(const char *a, const char *b, size_t current)
@@ -322,8 +597,7 @@ static bool path_entry_matches(const struct dirent *entry, const char *base, siz
 }
 
 static void complete_path(tdsh_session_t *session,
-                          const tdsh_terminal_io_t *io,
-                          const char *prompt,
+                          edit_t *e,
                           char *buffer,
                           size_t capacity,
                           size_t *length,
@@ -333,7 +607,7 @@ static void complete_path(tdsh_session_t *session,
 {
     if (*cursor != end)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -341,7 +615,7 @@ static void complete_path(tdsh_session_t *session,
     size_t token_len = end - start;
     if (token_len >= sizeof(token))
     {
-        bell(io);
+        bell(e->io);
         return;
     }
     memcpy(token, buffer + start, token_len);
@@ -366,7 +640,7 @@ static void complete_path(tdsh_session_t *session,
         size_t typed_len = directory_len + 1U;
         if (typed_len >= sizeof(typed_prefix))
         {
-            bell(io);
+            bell(e->io);
             return;
         }
         memcpy(typed_prefix, token, typed_len);
@@ -382,14 +656,14 @@ static void complete_path(tdsh_session_t *session,
     char real[TDSH_MAX_REAL_PATH];
     if (tdsh_path_to_real(session, directory_input, real, sizeof(real), NULL, 0) != 0)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
     DIR *directory = opendir(real);
     if (!directory)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -422,7 +696,7 @@ static void complete_path(tdsh_session_t *session,
 
     if (count == 0U)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -431,7 +705,7 @@ static void complete_path(tdsh_session_t *session,
                      typed_prefix, (int)common, first_name);
     if (n < 0 || (size_t)n >= sizeof(replacement))
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -440,7 +714,7 @@ static void complete_path(tdsh_session_t *session,
         size_t replacement_len = strlen(replacement);
         if (replacement_len + 1U >= sizeof(replacement))
         {
-            bell(io);
+            bell(e->io);
             return;
         }
         replacement[replacement_len] = first_is_dir ? '/' : ' ';
@@ -449,7 +723,7 @@ static void complete_path(tdsh_session_t *session,
 
     if (replace_token(buffer, capacity, length, cursor, start, end, replacement) != 0)
     {
-        bell(io);
+        bell(e->io);
         return;
     }
 
@@ -459,33 +733,32 @@ static void complete_path(tdsh_session_t *session,
         if (directory)
         {
             size_t shown = 0U;
-            (void)io_puts(io, "\r\n");
+            leave_line(e);
             while ((entry = readdir(directory)) != NULL && shown < TERM_PATH_DISPLAY_MAX)
             {
                 if (!path_entry_matches(entry, base, base_len))
                     continue;
                 bool is_dir = path_entry_is_dir(real, entry->d_name);
-                (void)io_printf(io, "%-18s%s", entry->d_name, is_dir ? "/" : "");
+                (void)io_printf(e->io, "%-18s%s", entry->d_name, is_dir ? "/" : "");
                 shown++;
                 if (shown % 4U == 0U || shown == count || shown == TERM_PATH_DISPLAY_MAX)
                 {
-                    (void)io_puts(io, "\r\n");
+                    (void)io_puts(e->io, "\r\n");
                 }
             }
             if (count > TERM_PATH_DISPLAY_MAX)
             {
-                (void)io_printf(io, "... %u more\r\n", (unsigned)(count - TERM_PATH_DISPLAY_MAX));
+                (void)io_printf(e->io, "... %u more\r\n", (unsigned)(count - TERM_PATH_DISPLAY_MAX));
             }
             closedir(directory);
         }
     }
 
-    redraw(io, prompt, buffer, *length, *cursor);
+    refresh(e, buffer, *length, *cursor);
 }
 
 static void complete(tdsh_session_t *session,
-                     const tdsh_terminal_io_t *io,
-                     const char *prompt,
+                     edit_t *e,
                      char *buffer,
                      size_t capacity,
                      size_t *length,
@@ -508,25 +781,18 @@ static void complete(tdsh_session_t *session,
         }
     }
     if (first)
-        complete_command(io, prompt, buffer, capacity, length, cursor, start, end);
+        complete_command(e, buffer, capacity, length, cursor, start, end);
     else
-        complete_path(session, io, prompt, buffer, capacity, length, cursor, start, end);
+        complete_path(session, e, buffer, capacity, length, cursor, start, end);
 }
 
-static int read_byte(const tdsh_terminal_io_t *io, uint8_t *out)
-{
-    if (!io || !io->read_byte || !out)
-        return -EINVAL;
-    return io->read_byte(io->context, out);
-}
-
-static int read_escape_sequence(const tdsh_terminal_io_t *io,
+static int read_escape_sequence(edit_t *e,
                                 uint8_t *final_out,
                                 unsigned *param_out,
                                 bool *has_param_out)
 {
     uint8_t second = 0U;
-    if (read_byte(io, &second) != 0)
+    if (edit_read(e, &second) != 0)
         return -EIO;
     if (second != '[' && second != 'O')
         return 1;
@@ -534,7 +800,7 @@ static int read_escape_sequence(const tdsh_terminal_io_t *io,
     if (second == 'O')
     {
         uint8_t final = 0U;
-        if (read_byte(io, &final) != 0)
+        if (edit_read(e, &final) != 0)
             return -EIO;
         *final_out = final;
         *param_out = 0U;
@@ -547,7 +813,7 @@ static int read_escape_sequence(const tdsh_terminal_io_t *io,
     for (;;)
     {
         uint8_t ch = 0U;
-        if (read_byte(io, &ch) != 0)
+        if (edit_read(e, &ch) != 0)
             return -EIO;
         if (ch >= '0' && ch <= '9')
         {
@@ -567,6 +833,18 @@ static int read_escape_sequence(const tdsh_terminal_io_t *io,
     }
 }
 
+/* Bytes of a UTF-8 sequence that starts with `lead` (1 for anything else). */
+static size_t utf8_sequence_length(uint8_t lead)
+{
+    if (lead >= 0xF0U && lead <= 0xF4U)
+        return 4U;
+    if (lead >= 0xE0U)
+        return lead <= 0xEFU ? 3U : 1U;
+    if (lead >= 0xC2U)
+        return 2U;
+    return 1U;
+}
+
 int tdsh_terminal_readline(tdsh_session_t *session,
                            const tdsh_terminal_io_t *io,
                            const char *prompt,
@@ -578,43 +856,55 @@ int tdsh_terminal_readline(tdsh_session_t *session,
         return -EINVAL;
     }
 
+    edit_t *e = &(edit_t){0};
+    e->io = io;
+    e->prompt = prompt ? prompt : "";
+    e->prompt_cols = text_columns(e->prompt, strlen(e->prompt));
+    e->cols = terminal_columns(e);
+    if (e->cols == 0U)
+        e->cols = TERM_DEFAULT_COLUMNS;
+
     size_t length = 0U;
     size_t cursor = 0U;
     size_t history_back = 0U;
     char pre_history[TDSH_MAX_LINE + 1U] = {0};
     buffer[0] = '\0';
-    (void)io_puts(io, prompt ? prompt : "");
+    (void)io_puts(io, e->prompt);
+    text_printed_to(e, e->prompt_cols);
 
     for (;;)
     {
         uint8_t ch = 0U;
-        if (read_byte(io, &ch) != 0)
+        if (edit_read(e, &ch) != 0)
             return -EIO;
 
         if (ch == '\r' || ch == '\n')
         {
             buffer[length] = '\0';
-            (void)io_puts(io, "\r\n");
+            leave_line(e);
             if (length)
                 history_append(session, buffer);
             return (int)length;
         }
         if (ch == 0x03U)
         { /* Ctrl+C */
+            move_cursor(e, buffer, length);
+            (void)io_puts(io, "^C");
+            e->end_wrapped = false; /* ^C is on the last row */
+            leave_line(e);
             buffer[0] = '\0';
-            (void)io_puts(io, "^C\r\n");
             return 0;
         }
         if (ch == 0x01U)
         { /* Ctrl+A */
             cursor = 0U;
-            redraw(io, prompt, buffer, length, cursor);
+            move_cursor(e, buffer, cursor);
             continue;
         }
         if (ch == 0x05U)
         { /* Ctrl+E */
             cursor = length;
-            redraw(io, prompt, buffer, length, cursor);
+            move_cursor(e, buffer, cursor);
             continue;
         }
         if (ch == 0x15U)
@@ -623,7 +913,7 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             length -= cursor;
             cursor = 0U;
             history_back = 0U;
-            redraw(io, prompt, buffer, length, cursor);
+            refresh(e, buffer, length, cursor);
             continue;
         }
         if (ch == 0x0BU)
@@ -631,13 +921,16 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             buffer[cursor] = '\0';
             length = cursor;
             history_back = 0U;
-            redraw(io, prompt, buffer, length, cursor);
+            refresh(e, buffer, length, cursor);
             continue;
         }
         if (ch == 0x0CU)
         { /* Ctrl+L */
             (void)io_puts(io, "\033[2J\033[H");
-            redraw(io, prompt, buffer, length, cursor);
+            e->rows = 1U;
+            e->cursor_row = 0U;
+            e->end_wrapped = false;
+            refresh(e, buffer, length, cursor);
             continue;
         }
         if (ch == 0x08U || ch == 0x7FU)
@@ -647,16 +940,17 @@ int tdsh_terminal_readline(tdsh_session_t *session,
                 bell(io);
                 continue;
             }
-            memmove(buffer + cursor - 1U, buffer + cursor, length - cursor + 1U);
-            cursor--;
-            length--;
+            size_t from = prev_char(buffer, cursor);
+            memmove(buffer + from, buffer + cursor, length - cursor + 1U);
+            length -= cursor - from;
+            cursor = from;
             history_back = 0U;
-            redraw(io, prompt, buffer, length, cursor);
+            refresh(e, buffer, length, cursor);
             continue;
         }
         if (ch == '\t')
         {
-            complete(session, io, prompt, buffer, capacity, &length, &cursor);
+            complete(session, e, buffer, capacity, &length, &cursor);
             continue;
         }
         if (ch == 0x1BU)
@@ -664,7 +958,7 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             uint8_t final = 0U;
             unsigned param = 0U;
             bool has_param = false;
-            int esc_rc = read_escape_sequence(io, &final, &param, &has_param);
+            int esc_rc = read_escape_sequence(e, &final, &param, &has_param);
             if (esc_rc != 0)
                 continue;
 
@@ -678,7 +972,7 @@ int tdsh_terminal_readline(tdsh_session_t *session,
                     history_back++;
                     snprintf(buffer, capacity, "%s", history);
                     length = cursor = strlen(buffer);
-                    redraw(io, prompt, buffer, length, cursor);
+                    refresh(e, buffer, length, cursor);
                 }
                 else
                     bell(io);
@@ -693,7 +987,7 @@ int tdsh_terminal_readline(tdsh_session_t *session,
                     {
                         snprintf(buffer, capacity, "%s", history);
                         length = cursor = strlen(buffer);
-                        redraw(io, prompt, buffer, length, cursor);
+                        refresh(e, buffer, length, cursor);
                     }
                 }
                 else if (history_back == 1U)
@@ -701,7 +995,7 @@ int tdsh_terminal_readline(tdsh_session_t *session,
                     history_back = 0U;
                     snprintf(buffer, capacity, "%s", pre_history);
                     length = cursor = strlen(buffer);
-                    redraw(io, prompt, buffer, length, cursor);
+                    refresh(e, buffer, length, cursor);
                 }
                 else
                     bell(io);
@@ -710,8 +1004,8 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             { /* Right */
                 if (cursor < length)
                 {
-                    cursor++;
-                    (void)io_puts(io, "\033[C");
+                    cursor = next_char(buffer, length, cursor);
+                    move_cursor(e, buffer, cursor);
                 }
                 else
                     bell(io);
@@ -720,8 +1014,8 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             { /* Left */
                 if (cursor > 0U)
                 {
-                    cursor--;
-                    (void)io_puts(io, "\033[D");
+                    cursor = prev_char(buffer, cursor);
+                    move_cursor(e, buffer, cursor);
                 }
                 else
                     bell(io);
@@ -729,21 +1023,22 @@ int tdsh_terminal_readline(tdsh_session_t *session,
             else if (final == 'H' || (final == '~' && has_param && (param == 1U || param == 7U)))
             {
                 cursor = 0U;
-                redraw(io, prompt, buffer, length, cursor);
+                move_cursor(e, buffer, cursor);
             }
             else if (final == 'F' || (final == '~' && has_param && (param == 4U || param == 8U)))
             {
                 cursor = length;
-                redraw(io, prompt, buffer, length, cursor);
+                move_cursor(e, buffer, cursor);
             }
             else if (final == '~' && has_param && param == 3U)
             { /* Delete */
                 if (cursor < length)
                 {
-                    memmove(buffer + cursor, buffer + cursor + 1U, length - cursor);
-                    length--;
+                    size_t to = next_char(buffer, length, cursor);
+                    memmove(buffer + cursor, buffer + to, length - to + 1U);
+                    length -= to - cursor;
                     history_back = 0U;
-                    redraw(io, prompt, buffer, length, cursor);
+                    refresh(e, buffer, length, cursor);
                 }
                 else
                     bell(io);
@@ -753,7 +1048,30 @@ int tdsh_terminal_readline(tdsh_session_t *session,
 
         if (ch < 0x20U)
             continue;
-        if (length + 1U >= capacity)
+
+        /* A whole UTF-8 sequence goes in at once, so the cursor never
+         * stops inside a character. A byte that cannot continue it is
+         * handled next as a key of its own. */
+        uint8_t seq[4] = {ch};
+        size_t seq_len = 1U;
+        size_t want = utf8_sequence_length(ch);
+        while (seq_len < want)
+        {
+            uint8_t next = 0U;
+            if (edit_read(e, &next) != 0)
+                return -EIO;
+            if (!utf8_continuation(next))
+            {
+                if (e->pushback_pos > 0U)
+                    e->pushback[--e->pushback_pos] = next;
+                else
+                    (void)pushback_add(e, &next, 1U);
+                break;
+            }
+            seq[seq_len++] = next;
+        }
+
+        if (length + seq_len >= capacity)
         {
             bell(io);
             continue;
@@ -761,20 +1079,22 @@ int tdsh_terminal_readline(tdsh_session_t *session,
 
         if (cursor == length)
         {
-            buffer[length++] = (char)ch;
+            memcpy(buffer + length, seq, seq_len);
+            length += seq_len;
             buffer[length] = '\0';
             cursor = length;
             history_back = 0U;
-            (void)io_write(io, &ch, 1U);
+            (void)io_write(io, seq, seq_len);
+            text_printed_to(e, e->prompt_cols + text_columns(buffer, length));
         }
         else
         {
-            memmove(buffer + cursor + 1U, buffer + cursor, length - cursor + 1U);
-            buffer[cursor] = (char)ch;
-            cursor++;
-            length++;
+            memmove(buffer + cursor + seq_len, buffer + cursor, length - cursor + 1U);
+            memcpy(buffer + cursor, seq, seq_len);
+            cursor += seq_len;
+            length += seq_len;
             history_back = 0U;
-            redraw(io, prompt, buffer, length, cursor);
+            refresh(e, buffer, length, cursor);
         }
     }
 }
