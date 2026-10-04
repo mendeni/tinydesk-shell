@@ -216,5 +216,7 @@ Firmware built with the ESP-IDF component includes wolfSSH and wolfSSL
 
 Issues and pull requests are welcome. Run the host tests and build the
 standalone firmware before sending a change, format the C files you
-change with `clang-format -i` (the repository's `.clang-format`), and
-keep board-specific pins out of the code (use board configuration keys).
+change with clang-format 16 (`clang-format -i`, the repository's
+`.clang-format`; one way to get it: `pip install clang-format==16.0.6`),
+and keep board-specific pins out of the code (use board configuration
+keys).
