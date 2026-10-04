@@ -1,0 +1,4 @@
+# clang-format
+cd3a315e3603c486e746780cbaac93f7c9667519
+# no indent inside extern "C"
+dbea65ebce2ba24056691b209da6d4564f6380ee
