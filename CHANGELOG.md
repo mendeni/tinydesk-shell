@@ -14,6 +14,10 @@
 * **Code style:** the C sources are formatted with `clang-format`
   (`.clang-format` in the repository root): braces on their own lines, one
   statement per line. Layout only; the code is unchanged.
+* **Contributing:** a pre-commit hook (`.pre-commit-config.yaml`; set up with
+  `pip install pre-commit` and `pre-commit install`) formats the C files of
+  every commit with clang-format 16.0.6, the version CI checks with.
+  `CONTRIBUTING.md` describes building, testing and formatting.
 
 ## 0.1.3 (2026-10-01)
 
