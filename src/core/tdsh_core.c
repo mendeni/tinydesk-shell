@@ -9,15 +9,18 @@
 
 #define TDSH_ALLOC_MAGIC 0x5553484Cu /* USHL */
 
-typedef union {
-    struct {
+typedef union
+{
+    struct
+    {
         size_t size;
         uint32_t magic;
     } meta;
     max_align_t alignment;
 } tdsh_alloc_header_t;
 
-typedef struct {
+typedef struct
+{
     tdsh_core_config_t cfg;
     char hostname[TDSH_HOSTNAME_MAX];
     char default_user[TDSH_USERNAME_MAX];
@@ -41,28 +44,32 @@ static void atomic_peak(atomic_size_t *peak, size_t value)
     while (value > seen &&
            !atomic_compare_exchange_weak_explicit(peak, &seen, value,
                                                   memory_order_relaxed,
-                                                  memory_order_relaxed)) {
+                                                  memory_order_relaxed))
+    {
     }
 }
 
 static void *raw_malloc(size_t n)
 {
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (p && p->malloc_fn) return p->malloc_fn(p->context, n);
+    if (p && p->malloc_fn)
+        return p->malloc_fn(p->context, n);
     return malloc(n);
 }
 
 static void *raw_realloc(void *ptr, size_t n)
 {
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (p && p->realloc_fn) return p->realloc_fn(p->context, ptr, n);
+    if (p && p->realloc_fn)
+        return p->realloc_fn(p->context, ptr, n);
     return realloc(ptr, n);
 }
 
 static void raw_free(void *ptr)
 {
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (p && p->free_fn) {
+    if (p && p->free_fn)
+    {
         p->free_fn(p->context, ptr);
         return;
     }
@@ -71,12 +78,14 @@ static void raw_free(void *ptr)
 
 int tdsh_core_init(const tdsh_core_config_t *config)
 {
-    if (!config || !config->hostname || !config->default_user || !config->fs_root) {
+    if (!config || !config->hostname || !config->default_user || !config->fs_root)
+    {
         return -EINVAL;
     }
     if (strlen(config->hostname) >= sizeof(s_core.hostname) ||
         strlen(config->default_user) >= sizeof(s_core.default_user) ||
-        strlen(config->fs_root) >= sizeof(s_core.fs_root)) {
+        strlen(config->fs_root) >= sizeof(s_core.fs_root))
+    {
         return -ENAMETOOLONG;
     }
 
@@ -89,7 +98,8 @@ int tdsh_core_init(const tdsh_core_config_t *config)
     s_core.cfg.hostname = s_core.hostname;
     s_core.cfg.default_user = s_core.default_user;
     s_core.cfg.fs_root = s_core.fs_root;
-    if (s_core.cfg.history_length == 0) s_core.cfg.history_length = 50;
+    if (s_core.cfg.history_length == 0)
+        s_core.cfg.history_length = 50;
     s_core.initialized = true;
     return 0;
 }
@@ -108,28 +118,36 @@ const tdsh_core_config_t *tdsh_core_config(void)
 
 const char *tdsh_platform_name(void)
 {
-    if (s_core.cfg.platform && s_core.cfg.platform->name) {
+    if (s_core.cfg.platform && s_core.cfg.platform->name)
+    {
         return s_core.cfg.platform->name;
     }
     return "generic-c";
 }
 
 int tdsh_session_init(tdsh_session_t *session,
-                        const char *username,
-                        bool interactive)
+                      const char *username,
+                      bool interactive)
 {
-    if (!s_core.initialized || !session) return -EINVAL;
-    if (!username || !username[0]) username = s_core.cfg.default_user;
-    if (strlen(username) >= TDSH_USERNAME_MAX) return -ENAMETOOLONG;
+    if (!s_core.initialized || !session)
+        return -EINVAL;
+    if (!username || !username[0])
+        username = s_core.cfg.default_user;
+    if (strlen(username) >= TDSH_USERNAME_MAX)
+        return -ENAMETOOLONG;
 
     memset(session, 0, sizeof(*session));
     snprintf(session->username, sizeof(session->username), "%s", username);
     snprintf(session->hostname, sizeof(session->hostname), "%s", s_core.cfg.hostname);
-    if (strcmp(username, "root") == 0) {
+    if (strcmp(username, "root") == 0)
+    {
         snprintf(session->home, sizeof(session->home), "/root");
-    } else {
+    }
+    else
+    {
         int n = snprintf(session->home, sizeof(session->home), "/home/%s", username);
-        if (n < 0 || (size_t)n >= sizeof(session->home)) return -ENAMETOOLONG;
+        if (n < 0 || (size_t)n >= sizeof(session->home))
+            return -ENAMETOOLONG;
     }
     snprintf(session->cwd, sizeof(session->cwd), "%s", session->home);
     session->interactive = interactive;
@@ -138,10 +156,11 @@ int tdsh_session_init(tdsh_session_t *session,
 }
 
 int tdsh_session_clone(tdsh_session_t *dst,
-                         const tdsh_session_t *src,
-                         bool interactive)
+                       const tdsh_session_t *src,
+                       bool interactive)
 {
-    if (!dst || !src) return -EINVAL;
+    if (!dst || !src)
+        return -EINVAL;
     memcpy(dst, src, sizeof(*dst));
     dst->interactive = interactive;
     dst->logout_requested = false;
@@ -152,12 +171,16 @@ int tdsh_session_clone(tdsh_session_t *dst,
 int tdsh_register_command(const tdsh_command_t *command)
 {
     if (!s_core.initialized || !command || !command->name || !command->name[0] ||
-        !command->usage || !command->help || !command->fn) {
+        !command->usage || !command->help || !command->fn)
+    {
         return -EINVAL;
     }
-    if (s_core.command_count >= TDSH_MAX_COMMANDS) return -ENOSPC;
-    for (size_t i = 0; i < s_core.command_count; ++i) {
-        if (strcmp(s_core.commands[i].name, command->name) == 0) return -EEXIST;
+    if (s_core.command_count >= TDSH_MAX_COMMANDS)
+        return -ENOSPC;
+    for (size_t i = 0; i < s_core.command_count; ++i)
+    {
+        if (strcmp(s_core.commands[i].name, command->name) == 0)
+            return -EEXIST;
     }
     s_core.commands[s_core.command_count++] = *command;
     return 0;
@@ -165,43 +188,54 @@ int tdsh_register_command(const tdsh_command_t *command)
 
 int tdsh_register_commands(const tdsh_command_t *commands, size_t count)
 {
-    if (!commands && count) return -EINVAL;
-    for (size_t i = 0; i < count; ++i) {
+    if (!commands && count)
+        return -EINVAL;
+    for (size_t i = 0; i < count; ++i)
+    {
         int rc = tdsh_register_command(&commands[i]);
-        if (rc != 0) return rc;
+        if (rc != 0)
+            return rc;
     }
     return 0;
 }
 
 const tdsh_command_t *tdsh_commands_get(size_t *count)
 {
-    if (count) *count = s_core.command_count;
+    if (count)
+        *count = s_core.command_count;
     return s_core.commands;
 }
 
 const tdsh_command_t *tdsh_command_find(const char *name)
 {
-    if (!name) return NULL;
-    for (size_t i = 0; i < s_core.command_count; ++i) {
-        if (strcmp(s_core.commands[i].name, name) == 0) return &s_core.commands[i];
+    if (!name)
+        return NULL;
+    for (size_t i = 0; i < s_core.command_count; ++i)
+    {
+        if (strcmp(s_core.commands[i].name, name) == 0)
+            return &s_core.commands[i];
     }
     return NULL;
 }
 
 int tdsh_execute_argv(tdsh_session_t *session, int argc, char **argv)
 {
-    if (!session || argc <= 0 || !argv || !argv[0]) return 0;
+    if (!session || argc <= 0 || !argv || !argv[0])
+        return 0;
     const tdsh_command_t *cmd = tdsh_command_find(argv[0]);
-    if (!cmd) {
+    if (!cmd)
+    {
         printf("tdsh: command not found: %s\n", argv[0]);
         return 127;
     }
     if ((cmd->flags & TDSH_CMD_ROOT_ONLY) != 0 &&
-        strcmp(session->username, "root") != 0) {
+        strcmp(session->username, "root") != 0)
+    {
         printf("tdsh: permission denied: root required\n");
         return 126;
     }
-    if ((cmd->flags & TDSH_CMD_INTERACTIVE) != 0 && !session->interactive) {
+    if ((cmd->flags & TDSH_CMD_INTERACTIVE) != 0 && !session->interactive)
+    {
         printf("tdsh: command requires an interactive terminal: %s\n", cmd->name);
         return 126;
     }
@@ -216,14 +250,21 @@ static bool protected_var(const char *name)
 
 const char *tdsh_var_get(tdsh_session_t *session, const char *name)
 {
-    if (!session || !name) return NULL;
-    if (strcmp(name, "USER") == 0) return session->username;
-    if (strcmp(name, "HOME") == 0) return session->home;
-    if (strcmp(name, "PWD") == 0) return session->cwd;
-    if (strcmp(name, "HOSTNAME") == 0) return session->hostname;
+    if (!session || !name)
+        return NULL;
+    if (strcmp(name, "USER") == 0)
+        return session->username;
+    if (strcmp(name, "HOME") == 0)
+        return session->home;
+    if (strcmp(name, "PWD") == 0)
+        return session->cwd;
+    if (strcmp(name, "HOSTNAME") == 0)
+        return session->hostname;
 
-    for (size_t i = 0; i < TDSH_MAX_VARS; ++i) {
-        if (session->vars[i].used && strcmp(session->vars[i].name, name) == 0) {
+    for (size_t i = 0; i < TDSH_MAX_VARS; ++i)
+    {
+        if (session->vars[i].used && strcmp(session->vars[i].name, name) == 0)
+        {
             return session->vars[i].value;
         }
     }
@@ -232,25 +273,34 @@ const char *tdsh_var_get(tdsh_session_t *session, const char *name)
 
 int tdsh_var_set(tdsh_session_t *session, const char *name, const char *value)
 {
-    if (!session || !name || !value || name[0] == '\0') return -EINVAL;
-    if (protected_var(name)) return -EPERM;
-    if (strlen(name) >= TDSH_VAR_NAME_MAX || strlen(value) >= TDSH_VAR_VALUE_MAX) {
+    if (!session || !name || !value || name[0] == '\0')
+        return -EINVAL;
+    if (protected_var(name))
+        return -EPERM;
+    if (strlen(name) >= TDSH_VAR_NAME_MAX || strlen(value) >= TDSH_VAR_VALUE_MAX)
+    {
         return -ENOSPC;
     }
 
     tdsh_var_t *free_slot = NULL;
-    for (size_t i = 0; i < TDSH_MAX_VARS; ++i) {
-        if (session->vars[i].used) {
-            if (strcmp(session->vars[i].name, name) == 0) {
+    for (size_t i = 0; i < TDSH_MAX_VARS; ++i)
+    {
+        if (session->vars[i].used)
+        {
+            if (strcmp(session->vars[i].name, name) == 0)
+            {
                 snprintf(session->vars[i].value, sizeof(session->vars[i].value), "%s", value);
                 return 0;
             }
-        } else if (!free_slot) {
+        }
+        else if (!free_slot)
+        {
             free_slot = &session->vars[i];
         }
     }
 
-    if (!free_slot) return -ENOSPC;
+    if (!free_slot)
+        return -ENOSPC;
     memset(free_slot, 0, sizeof(*free_slot));
     free_slot->used = true;
     snprintf(free_slot->name, sizeof(free_slot->name), "%s", name);
@@ -260,10 +310,14 @@ int tdsh_var_set(tdsh_session_t *session, const char *name, const char *value)
 
 int tdsh_var_unset(tdsh_session_t *session, const char *name)
 {
-    if (!session || !name) return -EINVAL;
-    if (protected_var(name)) return -EPERM;
-    for (size_t i = 0; i < TDSH_MAX_VARS; ++i) {
-        if (session->vars[i].used && strcmp(session->vars[i].name, name) == 0) {
+    if (!session || !name)
+        return -EINVAL;
+    if (protected_var(name))
+        return -EPERM;
+    for (size_t i = 0; i < TDSH_MAX_VARS; ++i)
+    {
+        if (session->vars[i].used && strcmp(session->vars[i].name, name) == 0)
+        {
             memset(&session->vars[i], 0, sizeof(session->vars[i]));
             return 0;
         }
@@ -280,32 +334,39 @@ uint64_t tdsh_monotonic_ms(void)
 void tdsh_sleep_ms(uint32_t ms)
 {
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (p && p->sleep_ms) p->sleep_ms(p->context, ms);
+    if (p && p->sleep_ms)
+        p->sleep_ms(p->context, ms);
 }
 
 void tdsh_yield(void)
 {
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (p && p->yield) p->yield(p->context);
+    if (p && p->yield)
+        p->yield(p->context);
 }
 
 int tdsh_random_bytes(void *buffer, size_t length)
 {
-    if (!buffer && length) return -EINVAL;
+    if (!buffer && length)
+        return -EINVAL;
     const tdsh_platform_api_t *p = s_core.cfg.platform;
-    if (!p || !p->random_bytes) return -ENOSYS;
+    if (!p || !p->random_bytes)
+        return -ENOSYS;
     return p->random_bytes(p->context, buffer, length);
 }
 
 void *tdsh_malloc(size_t size)
 {
-    if (size == 0) size = 1;
-    if (size > SIZE_MAX - sizeof(tdsh_alloc_header_t)) {
+    if (size == 0)
+        size = 1;
+    if (size > SIZE_MAX - sizeof(tdsh_alloc_header_t))
+    {
         atomic_fetch_add_explicit(&s_failed_allocations, 1, memory_order_relaxed);
         return NULL;
     }
     tdsh_alloc_header_t *h = raw_malloc(sizeof(*h) + size);
-    if (!h) {
+    if (!h)
+    {
         atomic_fetch_add_explicit(&s_failed_allocations, 1, memory_order_relaxed);
         return NULL;
     }
@@ -321,41 +382,51 @@ void *tdsh_malloc(size_t size)
 
 void *tdsh_calloc(size_t count, size_t size)
 {
-    if (count != 0 && size > SIZE_MAX / count) {
+    if (count != 0 && size > SIZE_MAX / count)
+    {
         atomic_fetch_add_explicit(&s_failed_allocations, 1, memory_order_relaxed);
         return NULL;
     }
     size_t total = count * size;
     void *p = tdsh_malloc(total);
-    if (p) memset(p, 0, total);
+    if (p)
+        memset(p, 0, total);
     return p;
 }
 
 void *tdsh_realloc(void *ptr, size_t size)
 {
-    if (!ptr) return tdsh_malloc(size);
-    if (size == 0) {
+    if (!ptr)
+        return tdsh_malloc(size);
+    if (size == 0)
+    {
         tdsh_free(ptr);
         return NULL;
     }
-    if (size > SIZE_MAX - sizeof(tdsh_alloc_header_t)) return NULL;
+    if (size > SIZE_MAX - sizeof(tdsh_alloc_header_t))
+        return NULL;
 
     tdsh_alloc_header_t *old = ((tdsh_alloc_header_t *)ptr) - 1;
-    if (old->meta.magic != TDSH_ALLOC_MAGIC) return NULL;
+    if (old->meta.magic != TDSH_ALLOC_MAGIC)
+        return NULL;
     size_t old_size = old->meta.size;
 
     tdsh_alloc_header_t *h = raw_realloc(old, sizeof(*h) + size);
-    if (!h) {
+    if (!h)
+    {
         atomic_fetch_add_explicit(&s_failed_allocations, 1, memory_order_relaxed);
         return NULL;
     }
     h->meta.size = size;
     h->meta.magic = TDSH_ALLOC_MAGIC;
-    if (size > old_size) {
+    if (size > old_size)
+    {
         size_t delta = size - old_size;
         size_t bytes = atomic_fetch_add_explicit(&s_live_bytes, delta, memory_order_relaxed) + delta;
         atomic_peak(&s_peak_bytes, bytes);
-    } else if (old_size > size) {
+    }
+    else if (old_size > size)
+    {
         atomic_fetch_sub_explicit(&s_live_bytes, old_size - size, memory_order_relaxed);
     }
     return (void *)(h + 1);
@@ -363,9 +434,11 @@ void *tdsh_realloc(void *ptr, size_t size)
 
 void tdsh_free(void *ptr)
 {
-    if (!ptr) return;
+    if (!ptr)
+        return;
     tdsh_alloc_header_t *h = ((tdsh_alloc_header_t *)ptr) - 1;
-    if (h->meta.magic != TDSH_ALLOC_MAGIC) {
+    if (h->meta.magic != TDSH_ALLOC_MAGIC)
+    {
         /* Do not free an unknown pointer through the tracked allocator. */
         return;
     }
@@ -378,16 +451,19 @@ void tdsh_free(void *ptr)
 
 char *tdsh_strdup(const char *text)
 {
-    if (!text) return NULL;
+    if (!text)
+        return NULL;
     size_t n = strlen(text) + 1;
     char *copy = tdsh_malloc(n);
-    if (copy) memcpy(copy, text, n);
+    if (copy)
+        memcpy(copy, text, n);
     return copy;
 }
 
 void tdsh_memory_get_stats(tdsh_memory_stats_t *stats)
 {
-    if (!stats) return;
+    if (!stats)
+        return;
     stats->live_blocks = atomic_load_explicit(&s_live_blocks, memory_order_relaxed);
     stats->live_bytes = atomic_load_explicit(&s_live_bytes, memory_order_relaxed);
     stats->peak_blocks = atomic_load_explicit(&s_peak_blocks, memory_order_relaxed);

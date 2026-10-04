@@ -39,7 +39,8 @@ void app_main(void)
 {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
-        err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
@@ -53,7 +54,8 @@ void app_main(void)
     ESP_ERROR_CHECK(tdsh_espidf_init(&cfg));
     int rc = tdsh_register_commands(s_app_commands,
                                     sizeof(s_app_commands) / sizeof(s_app_commands[0]));
-    if (rc != 0) {
+    if (rc != 0)
+    {
         ESP_LOGE(TAG, "application command registration failed: %d", rc);
         return;
     }

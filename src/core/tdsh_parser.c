@@ -30,9 +30,9 @@
  * tdsh_script.c.
  */
 
-#define USCRIPT_PIPE_MAX_STAGES      8
-#define USCRIPT_CAPTURE_INITIAL      256U
-#define USCRIPT_CAPTURE_MAX          8192U
+#define USCRIPT_PIPE_MAX_STAGES 8
+#define USCRIPT_CAPTURE_INITIAL 256U
+#define USCRIPT_CAPTURE_MAX     8192U
 
 static bool is_var_name_start(char c)
 {
@@ -46,7 +46,8 @@ static bool is_var_name_char(char c)
 
 static int append_char(char *out, size_t out_size, size_t *out_len, char c)
 {
-    if (*out_len + 1U >= out_size) return -ENOSPC;
+    if (*out_len + 1U >= out_size)
+        return -ENOSPC;
     out[(*out_len)++] = c;
     out[*out_len] = '\0';
     return 0;
@@ -55,8 +56,10 @@ static int append_char(char *out, size_t out_size, size_t *out_len, char c)
 static int append_n(char *out, size_t out_size, size_t *out_len,
                     const char *text, size_t n)
 {
-    if (*out_len + n >= out_size) return -ENOSPC;
-    if (n) memcpy(out + *out_len, text, n);
+    if (*out_len + n >= out_size)
+        return -ENOSPC;
+    if (n)
+        memcpy(out + *out_len, text, n);
     *out_len += n;
     out[*out_len] = '\0';
     return 0;
@@ -70,13 +73,17 @@ static int append_text(char *out, size_t out_size, size_t *out_len,
 
 static void trim_inplace(char *text)
 {
-    if (!text) return;
+    if (!text)
+        return;
     char *start = text;
-    while (*start && isspace((unsigned char)*start)) start++;
-    if (start != text) memmove(text, start, strlen(start) + 1U);
+    while (*start && isspace((unsigned char)*start))
+        start++;
+    if (start != text)
+        memmove(text, start, strlen(start) + 1U);
 
     size_t len = strlen(text);
-    while (len > 0 && isspace((unsigned char)text[len - 1U])) {
+    while (len > 0 && isspace((unsigned char)text[len - 1U]))
+    {
         text[--len] = '\0';
     }
 }
@@ -84,38 +91,49 @@ static void trim_inplace(char *text)
 /* Return the matching ')' for input[open_index] == '(' while honoring quotes. */
 static int find_matching_paren(const char *input, size_t open_index, size_t *end_out)
 {
-    if (!input || input[open_index] != '(' || !end_out) return -EINVAL;
+    if (!input || input[open_index] != '(' || !end_out)
+        return -EINVAL;
 
     unsigned depth = 1;
     bool single = false;
     bool dbl = false;
     bool escaped = false;
 
-    for (size_t i = open_index + 1U; input[i]; ++i) {
+    for (size_t i = open_index + 1U; input[i]; ++i)
+    {
         char c = input[i];
 
-        if (escaped) {
+        if (escaped)
+        {
             escaped = false;
             continue;
         }
-        if (c == '\\' && !single) {
+        if (c == '\\' && !single)
+        {
             escaped = true;
             continue;
         }
-        if (!dbl && c == '\'') {
+        if (!dbl && c == '\'')
+        {
             single = !single;
             continue;
         }
-        if (!single && c == '"') {
+        if (!single && c == '"')
+        {
             dbl = !dbl;
             continue;
         }
-        if (single || dbl) continue;
+        if (single || dbl)
+            continue;
 
-        if (c == '(') {
+        if (c == '(')
+        {
             depth++;
-        } else if (c == ')') {
-            if (--depth == 0) {
+        }
+        else if (c == ')')
+        {
+            if (--depth == 0)
+            {
                 *end_out = i;
                 return 0;
             }
@@ -126,7 +144,8 @@ static int find_matching_paren(const char *input, size_t open_index, size_t *end
 
 /* ---------- Integer expression evaluator ---------- */
 
-typedef struct {
+typedef struct
+{
     tdsh_session_t *session;
     const char *p;
     bool ok;
@@ -134,14 +153,16 @@ typedef struct {
 
 static void expr_ws(expr_parser_t *ep)
 {
-    while (isspace((unsigned char)*ep->p)) ep->p++;
+    while (isspace((unsigned char)*ep->p))
+        ep->p++;
 }
 
 static bool expr_match(expr_parser_t *ep, const char *op)
 {
     expr_ws(ep);
     size_t n = strlen(op);
-    if (strncmp(ep->p, op, n) == 0) {
+    if (strncmp(ep->p, op, n) == 0)
+    {
         ep->p += n;
         return true;
     }
@@ -150,14 +171,16 @@ static bool expr_match(expr_parser_t *ep, const char *op)
 
 static int64_t string_to_int(const char *value, bool *ok)
 {
-    if (!value || !value[0]) {
+    if (!value || !value[0])
+    {
         *ok = false;
         return 0;
     }
     char *end = NULL;
     errno = 0;
     long long v = strtoll(value, &end, 0);
-    if (errno != 0 || end == value || *end != '\0') {
+    if (errno != 0 || end == value || *end != '\0')
+    {
         *ok = false;
         return 0;
     }
@@ -169,12 +192,14 @@ static const char *resolve_named_value(tdsh_session_t *session,
                                        const char *name,
                                        char *special, size_t special_size)
 {
-    if (strcmp(name, "?") == 0) {
+    if (strcmp(name, "?") == 0)
+    {
         snprintf(special, special_size, "%d", session ? session->last_status : 0);
         return special;
     }
 
-    if (tdsh_script_special_var(session, name, special, special_size)) {
+    if (tdsh_script_special_var(session, name, special, special_size))
+    {
         return special;
     }
 
@@ -187,11 +212,13 @@ static int64_t expr_primary(expr_parser_t *ep)
 {
     expr_ws(ep);
 
-    if (*ep->p == '(') {
+    if (*ep->p == '(')
+    {
         ep->p++;
         int64_t v = expr_or(ep);
         expr_ws(ep);
-        if (*ep->p != ')') {
+        if (*ep->p != ')')
+        {
             ep->ok = false;
             return 0;
         }
@@ -199,32 +226,46 @@ static int64_t expr_primary(expr_parser_t *ep)
         return v;
     }
 
-    if (*ep->p == '$') {
+    if (*ep->p == '$')
+    {
         ep->p++;
         char name[TDSH_VAR_NAME_MAX];
         size_t n = 0;
 
-        if (*ep->p == '{') {
+        if (*ep->p == '{')
+        {
             ep->p++;
-            while (*ep->p && *ep->p != '}' && n + 1U < sizeof(name)) {
+            while (*ep->p && *ep->p != '}' && n + 1U < sizeof(name))
+            {
                 name[n++] = *ep->p++;
             }
-            if (*ep->p != '}') {
+            if (*ep->p != '}')
+            {
                 ep->ok = false;
                 return 0;
             }
             ep->p++;
-        } else if (*ep->p == '?' || *ep->p == '#') {
+        }
+        else if (*ep->p == '?' || *ep->p == '#')
+        {
             name[n++] = *ep->p++;
-        } else if (isdigit((unsigned char)*ep->p)) {
-            while (isdigit((unsigned char)*ep->p) && n + 1U < sizeof(name)) {
+        }
+        else if (isdigit((unsigned char)*ep->p))
+        {
+            while (isdigit((unsigned char)*ep->p) && n + 1U < sizeof(name))
+            {
                 name[n++] = *ep->p++;
             }
-        } else if (is_var_name_start(*ep->p)) {
-            while (is_var_name_char(*ep->p) && n + 1U < sizeof(name)) {
+        }
+        else if (is_var_name_start(*ep->p))
+        {
+            while (is_var_name_char(*ep->p) && n + 1U < sizeof(name))
+            {
                 name[n++] = *ep->p++;
             }
-        } else {
+        }
+        else
+        {
             ep->ok = false;
             return 0;
         }
@@ -235,34 +276,41 @@ static int64_t expr_primary(expr_parser_t *ep)
                                                 special, sizeof(special));
         bool ok = false;
         int64_t v = string_to_int(value ? value : "0", &ok);
-        if (!ok) ep->ok = false;
+        if (!ok)
+            ep->ok = false;
         return v;
     }
 
-    if (is_var_name_start(*ep->p)) {
+    if (is_var_name_start(*ep->p))
+    {
         char name[TDSH_VAR_NAME_MAX];
         size_t n = 0;
-        while (is_var_name_char(*ep->p) && n + 1U < sizeof(name)) {
+        while (is_var_name_char(*ep->p) && n + 1U < sizeof(name))
+        {
             name[n++] = *ep->p++;
         }
         name[n] = '\0';
 
-        if (strcmp(name, "true") == 0) return 1;
-        if (strcmp(name, "false") == 0) return 0;
+        if (strcmp(name, "true") == 0)
+            return 1;
+        if (strcmp(name, "false") == 0)
+            return 0;
 
         char special[64];
         const char *value = resolve_named_value(ep->session, name,
                                                 special, sizeof(special));
         bool ok = false;
         int64_t v = string_to_int(value ? value : "0", &ok);
-        if (!ok) ep->ok = false;
+        if (!ok)
+            ep->ok = false;
         return v;
     }
 
     char *end = NULL;
     errno = 0;
     long long value = strtoll(ep->p, &end, 0);
-    if (end == ep->p || errno != 0) {
+    if (end == ep->p || errno != 0)
+    {
         ep->ok = false;
         return 0;
     }
@@ -273,27 +321,46 @@ static int64_t expr_primary(expr_parser_t *ep)
 static int64_t expr_unary(expr_parser_t *ep)
 {
     expr_ws(ep);
-    if (expr_match(ep, "!")) return !expr_unary(ep);
-    if (expr_match(ep, "+")) return expr_unary(ep);
-    if (expr_match(ep, "-")) return -expr_unary(ep);
+    if (expr_match(ep, "!"))
+        return !expr_unary(ep);
+    if (expr_match(ep, "+"))
+        return expr_unary(ep);
+    if (expr_match(ep, "-"))
+        return -expr_unary(ep);
     return expr_primary(ep);
 }
 
 static int64_t expr_mul(expr_parser_t *ep)
 {
     int64_t v = expr_unary(ep);
-    while (ep->ok) {
-        if (expr_match(ep, "*")) {
+    while (ep->ok)
+    {
+        if (expr_match(ep, "*"))
+        {
             v *= expr_unary(ep);
-        } else if (expr_match(ep, "/")) {
+        }
+        else if (expr_match(ep, "/"))
+        {
             int64_t rhs = expr_unary(ep);
-            if (rhs == 0) { ep->ok = false; return 0; }
+            if (rhs == 0)
+            {
+                ep->ok = false;
+                return 0;
+            }
             v /= rhs;
-        } else if (expr_match(ep, "%")) {
+        }
+        else if (expr_match(ep, "%"))
+        {
             int64_t rhs = expr_unary(ep);
-            if (rhs == 0) { ep->ok = false; return 0; }
+            if (rhs == 0)
+            {
+                ep->ok = false;
+                return 0;
+            }
             v %= rhs;
-        } else break;
+        }
+        else
+            break;
     }
     return v;
 }
@@ -301,10 +368,14 @@ static int64_t expr_mul(expr_parser_t *ep)
 static int64_t expr_add(expr_parser_t *ep)
 {
     int64_t v = expr_mul(ep);
-    while (ep->ok) {
-        if (expr_match(ep, "+")) v += expr_mul(ep);
-        else if (expr_match(ep, "-")) v -= expr_mul(ep);
-        else break;
+    while (ep->ok)
+    {
+        if (expr_match(ep, "+"))
+            v += expr_mul(ep);
+        else if (expr_match(ep, "-"))
+            v -= expr_mul(ep);
+        else
+            break;
     }
     return v;
 }
@@ -312,12 +383,18 @@ static int64_t expr_add(expr_parser_t *ep)
 static int64_t expr_rel(expr_parser_t *ep)
 {
     int64_t v = expr_add(ep);
-    while (ep->ok) {
-        if (expr_match(ep, "<=")) v = (v <= expr_add(ep));
-        else if (expr_match(ep, ">=")) v = (v >= expr_add(ep));
-        else if (expr_match(ep, "<")) v = (v < expr_add(ep));
-        else if (expr_match(ep, ">")) v = (v > expr_add(ep));
-        else break;
+    while (ep->ok)
+    {
+        if (expr_match(ep, "<="))
+            v = (v <= expr_add(ep));
+        else if (expr_match(ep, ">="))
+            v = (v >= expr_add(ep));
+        else if (expr_match(ep, "<"))
+            v = (v < expr_add(ep));
+        else if (expr_match(ep, ">"))
+            v = (v > expr_add(ep));
+        else
+            break;
     }
     return v;
 }
@@ -325,10 +402,14 @@ static int64_t expr_rel(expr_parser_t *ep)
 static int64_t expr_eq(expr_parser_t *ep)
 {
     int64_t v = expr_rel(ep);
-    while (ep->ok) {
-        if (expr_match(ep, "==")) v = (v == expr_rel(ep));
-        else if (expr_match(ep, "!=")) v = (v != expr_rel(ep));
-        else break;
+    while (ep->ok)
+    {
+        if (expr_match(ep, "=="))
+            v = (v == expr_rel(ep));
+        else if (expr_match(ep, "!="))
+            v = (v != expr_rel(ep));
+        else
+            break;
     }
     return v;
 }
@@ -336,7 +417,8 @@ static int64_t expr_eq(expr_parser_t *ep)
 static int64_t expr_and(expr_parser_t *ep)
 {
     int64_t v = expr_eq(ep);
-    while (ep->ok && expr_match(ep, "&&")) {
+    while (ep->ok && expr_match(ep, "&&"))
+    {
         int64_t rhs = expr_eq(ep);
         v = (v && rhs);
     }
@@ -346,7 +428,8 @@ static int64_t expr_and(expr_parser_t *ep)
 static int64_t expr_or(expr_parser_t *ep)
 {
     int64_t v = expr_and(ep);
-    while (ep->ok && expr_match(ep, "||")) {
+    while (ep->ok && expr_match(ep, "||"))
+    {
         int64_t rhs = expr_and(ep);
         v = (v || rhs);
     }
@@ -354,20 +437,23 @@ static int64_t expr_or(expr_parser_t *ep)
 }
 
 int tdsh_eval_int_expr(tdsh_session_t *session, const char *expr,
-                         int64_t *value_out)
+                       int64_t *value_out)
 {
-    if (!session || !expr || !value_out) return -EINVAL;
+    if (!session || !expr || !value_out)
+        return -EINVAL;
     expr_parser_t ep = {.session = session, .p = expr, .ok = true};
     int64_t value = expr_or(&ep);
     expr_ws(&ep);
-    if (!ep.ok || *ep.p != '\0') return -EINVAL;
+    if (!ep.ok || *ep.p != '\0')
+        return -EINVAL;
     *value_out = value;
     return 0;
 }
 
 /* ---------- Task-local memory stream capture ---------- */
 
-typedef struct {
+typedef struct
+{
     const char *input;
     size_t input_len;
     size_t input_pos;
@@ -380,8 +466,10 @@ typedef struct {
 static int memio_read(void *cookie, char *buf, int len)
 {
     memio_t *io = (memio_t *)cookie;
-    if (!io || !buf || len <= 0) return 0;
-    if (io->input_pos >= io->input_len) return 0;
+    if (!io || !buf || len <= 0)
+        return 0;
+    if (io->input_pos >= io->input_len)
+        return 0;
 
     size_t remain = io->input_len - io->input_pos;
     size_t n = remain < (size_t)len ? remain : (size_t)len;
@@ -393,26 +481,33 @@ static int memio_read(void *cookie, char *buf, int len)
 static int memio_write(void *cookie, const char *buf, int len)
 {
     memio_t *io = (memio_t *)cookie;
-    if (!io || !buf || len <= 0) return 0;
+    if (!io || !buf || len <= 0)
+        return 0;
 
     size_t need = io->output_len + (size_t)len + 1U;
-    if (need > USCRIPT_CAPTURE_MAX + 1U) {
+    if (need > USCRIPT_CAPTURE_MAX + 1U)
+    {
         io->overflow = true;
         errno = ENOSPC;
         return -1;
     }
 
-    if (need > io->output_cap) {
+    if (need > io->output_cap)
+    {
         size_t cap = io->output_cap ? io->output_cap : USCRIPT_CAPTURE_INITIAL;
-        while (cap < need && cap < USCRIPT_CAPTURE_MAX + 1U) cap *= 2U;
-        if (cap > USCRIPT_CAPTURE_MAX + 1U) cap = USCRIPT_CAPTURE_MAX + 1U;
-        if (cap < need) {
+        while (cap < need && cap < USCRIPT_CAPTURE_MAX + 1U)
+            cap *= 2U;
+        if (cap > USCRIPT_CAPTURE_MAX + 1U)
+            cap = USCRIPT_CAPTURE_MAX + 1U;
+        if (cap < need)
+        {
             io->overflow = true;
             errno = ENOSPC;
             return -1;
         }
         char *p = tdsh_realloc(io->output, cap);
-        if (!p) {
+        if (!p)
+        {
             errno = ENOMEM;
             return -1;
         }
@@ -430,13 +525,15 @@ static int memio_write(void *cookie, const char *buf, int len)
 #if defined(__GLIBC__)
 static ssize_t memio_glibc_read(void *cookie, char *buf, size_t len)
 {
-    if (len > (size_t)INT_MAX) len = (size_t)INT_MAX;
+    if (len > (size_t)INT_MAX)
+        len = (size_t)INT_MAX;
     return (ssize_t)memio_read(cookie, buf, (int)len);
 }
 
 static ssize_t memio_glibc_write(void *cookie, const char *buf, size_t len)
 {
-    if (len > (size_t)INT_MAX) len = (size_t)INT_MAX;
+    if (len > (size_t)INT_MAX)
+        len = (size_t)INT_MAX;
     return (ssize_t)memio_write(cookie, buf, (int)len);
 }
 #endif
@@ -461,7 +558,8 @@ static int capture_execute(tdsh_session_t *session, const char *command,
                            const char *input, char **output_out,
                            int *status_out)
 {
-    if (!session || !command || !output_out || !status_out) return -EINVAL;
+    if (!session || !command || !output_out || !status_out)
+        return -EINVAL;
 
     memio_t io = {
         .input = input ? input : "",
@@ -469,7 +567,8 @@ static int capture_execute(tdsh_session_t *session, const char *command,
     };
 
     FILE *stream = memio_open_stream(&io);
-    if (!stream) return -errno;
+    if (!stream)
+        return -errno;
     setvbuf(stream, NULL, _IONBF, 0);
 
     FILE *old_in = stdin;
@@ -484,14 +583,17 @@ static int capture_execute(tdsh_session_t *session, const char *command,
     stdout = old_out;
     fclose(stream);
 
-    if (io.overflow) {
+    if (io.overflow)
+    {
         tdsh_free(io.output);
         return -ENOSPC;
     }
 
-    if (!io.output) {
+    if (!io.output)
+    {
         io.output = tdsh_strdup("");
-        if (!io.output) return -ENOMEM;
+        if (!io.output)
+            return -ENOMEM;
     }
 
     *output_out = io.output;
@@ -519,10 +621,12 @@ static int capture_execute_subshell(tdsh_session_t *session,
                                     char **output_out,
                                     int *status_out)
 {
-    if (!session) return -EINVAL;
+    if (!session)
+        return -EINVAL;
 
     tdsh_session_t *sub = tdsh_malloc(sizeof(*sub));
-    if (!sub) return -ENOMEM;
+    if (!sub)
+        return -ENOMEM;
 
     memcpy(sub, session, sizeof(*sub));
     int rc = capture_execute(sub, command, input, output_out, status_out);
@@ -532,13 +636,17 @@ static int capture_execute_subshell(tdsh_session_t *session,
 
 static void normalize_substitution_output(char *text)
 {
-    if (!text) return;
+    if (!text)
+        return;
     size_t len = strlen(text);
-    while (len > 0 && (text[len - 1U] == '\n' || text[len - 1U] == '\r')) {
+    while (len > 0 && (text[len - 1U] == '\n' || text[len - 1U] == '\r'))
+    {
         text[--len] = '\0';
     }
-    for (size_t i = 0; text[i]; ++i) {
-        if (text[i] == '\n' || text[i] == '\r') text[i] = ' ';
+    for (size_t i = 0; text[i]; ++i)
+    {
+        if (text[i] == '\n' || text[i] == '\r')
+            text[i] = ' ';
     }
 }
 
@@ -546,27 +654,38 @@ static void normalize_substitution_output(char *text)
 
 static bool glob_pattern_match(const char *pattern, const char *text)
 {
-    if (!pattern || !text) return false;
+    if (!pattern || !text)
+        return false;
 
-    while (*pattern) {
-        if (*pattern == '*') {
-            while (*pattern == '*') pattern++;
-            if (!*pattern) return true;
-            for (const char *p = text; ; ++p) {
-                if (glob_pattern_match(pattern, p)) return true;
-                if (!*p) break;
+    while (*pattern)
+    {
+        if (*pattern == '*')
+        {
+            while (*pattern == '*')
+                pattern++;
+            if (!*pattern)
+                return true;
+            for (const char *p = text;; ++p)
+            {
+                if (glob_pattern_match(pattern, p))
+                    return true;
+                if (!*p)
+                    break;
             }
             return false;
         }
 
-        if (*pattern == '?') {
-            if (!*text) return false;
+        if (*pattern == '?')
+        {
+            if (!*text)
+                return false;
             pattern++;
             text++;
             continue;
         }
 
-        if (*pattern != *text) return false;
+        if (*pattern != *text)
+            return false;
         pattern++;
         text++;
     }
@@ -610,7 +729,8 @@ static int append_glob_expansion(tdsh_session_t *session,
                                  bool *expanded_out)
 {
     if (!session || !token || !storage || !out_len ||
-        !argv || !argc || !expanded_out) {
+        !argv || !argc || !expanded_out)
+    {
         return -EINVAL;
     }
 
@@ -618,42 +738,54 @@ static int append_glob_expansion(tdsh_session_t *session,
 
     const char *slash = strrchr(token, '/');
     const char *pattern = slash ? slash + 1 : token;
-    if (!contains_glob_chars(pattern)) return 0;
+    if (!contains_glob_chars(pattern))
+        return 0;
 
     char dir_expr[TDSH_MAX_PATH];
     char result_prefix[TDSH_MAX_PATH];
     result_prefix[0] = '\0';
 
-    if (slash) {
+    if (slash)
+    {
         size_t dir_len = (size_t)(slash - token);
         size_t prefix_len = dir_len + 1U;
-        if (dir_len == 0) {
+        if (dir_len == 0)
+        {
             snprintf(dir_expr, sizeof(dir_expr), "/");
-        } else {
-            if (dir_len >= sizeof(dir_expr)) return -ENAMETOOLONG;
+        }
+        else
+        {
+            if (dir_len >= sizeof(dir_expr))
+                return -ENAMETOOLONG;
             memcpy(dir_expr, token, dir_len);
             dir_expr[dir_len] = '\0';
         }
 
-        if (prefix_len >= sizeof(result_prefix)) return -ENAMETOOLONG;
+        if (prefix_len >= sizeof(result_prefix))
+            return -ENAMETOOLONG;
         memcpy(result_prefix, token, prefix_len);
         result_prefix[prefix_len] = '\0';
-    } else {
+    }
+    else
+    {
         snprintf(dir_expr, sizeof(dir_expr), ".");
     }
 
     /* Recursive wildcard directory components are intentionally deferred. */
-    if (contains_glob_chars(dir_expr)) return 0;
+    if (contains_glob_chars(dir_expr))
+        return 0;
 
     char real_dir[TDSH_MAX_REAL_PATH];
     if (tdsh_path_to_real(session, dir_expr,
-                            real_dir, sizeof(real_dir),
-                            NULL, 0) != 0) {
+                          real_dir, sizeof(real_dir),
+                          NULL, 0) != 0)
+    {
         return 0; /* unmatched pattern stays literal */
     }
 
     DIR *dir = opendir(real_dir);
-    if (!dir) return 0; /* unmatched/inaccessible pattern stays literal */
+    if (!dir)
+        return 0; /* unmatched/inaccessible pattern stays literal */
 
     char *matches[TDSH_MAX_ARGS];
     size_t match_count = 0;
@@ -663,13 +795,18 @@ static int append_glob_expansion(tdsh_session_t *session,
     struct dirent *entry;
     int rc = 0;
 
-    while ((entry = readdir(dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL)
+    {
         const char *name = entry->d_name;
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
-        if (!allow_hidden && name[0] == '.') continue;
-        if (!glob_pattern_match(pattern, name)) continue;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+            continue;
+        if (!allow_hidden && name[0] == '.')
+            continue;
+        if (!glob_pattern_match(pattern, name))
+            continue;
 
-        if (match_count >= TDSH_MAX_ARGS) {
+        if (match_count >= TDSH_MAX_ARGS)
+        {
             rc = -E2BIG;
             break;
         }
@@ -677,13 +814,15 @@ static int append_glob_expansion(tdsh_session_t *session,
         size_t prefix_len = strlen(result_prefix);
         size_t name_len = strlen(name);
         size_t total = prefix_len + name_len;
-        if (total >= TDSH_MAX_PATH) {
+        if (total >= TDSH_MAX_PATH)
+        {
             rc = -ENAMETOOLONG;
             break;
         }
 
         char *item = tdsh_malloc(total + 1U);
-        if (!item) {
+        if (!item)
+        {
             rc = -ENOMEM;
             break;
         }
@@ -694,27 +833,37 @@ static int append_glob_expansion(tdsh_session_t *session,
 
     closedir(dir);
 
-    if (rc == 0 && match_count > 1U) {
+    if (rc == 0 && match_count > 1U)
+    {
         qsort(matches, match_count, sizeof(matches[0]), string_ptr_compare);
     }
 
-    if (rc == 0 && match_count > 0U) {
-        if (*argc + (int)match_count > TDSH_MAX_ARGS) {
+    if (rc == 0 && match_count > 0U)
+    {
+        if (*argc + (int)match_count > TDSH_MAX_ARGS)
+        {
             rc = -E2BIG;
-        } else {
-            for (size_t i = 0; i < match_count; ++i) {
+        }
+        else
+        {
+            for (size_t i = 0; i < match_count; ++i)
+            {
                 argv[(*argc)++] = storage + *out_len;
                 rc = append_text(storage, storage_size, out_len, matches[i]);
-                if (rc == 0) {
+                if (rc == 0)
+                {
                     rc = append_char(storage, storage_size, out_len, '\0');
                 }
-                if (rc != 0) break;
+                if (rc != 0)
+                    break;
             }
-            if (rc == 0) *expanded_out = true;
+            if (rc == 0)
+                *expanded_out = true;
         }
     }
 
-    for (size_t i = 0; i < match_count; ++i) tdsh_free(matches[i]);
+    for (size_t i = 0; i < match_count; ++i)
+        tdsh_free(matches[i]);
     return rc;
 }
 
@@ -728,9 +877,11 @@ static int finalize_parsed_token(tdsh_session_t *session,
                                  bool wildcard_unquoted)
 {
     int rc = append_char(storage, storage_size, out_len, '\0');
-    if (rc != 0) return rc;
+    if (rc != 0)
+        return rc;
 
-    if (!wildcard_unquoted || !contains_glob_chars(token_start)) {
+    if (!wildcard_unquoted || !contains_glob_chars(token_start))
+    {
         return 0;
     }
 
@@ -744,9 +895,11 @@ static int finalize_parsed_token(tdsh_session_t *session,
     rc = append_glob_expansion(session, token_start,
                                storage, storage_size, out_len,
                                argv, argc, &expanded);
-    if (rc != 0) return rc;
+    if (rc != 0)
+        return rc;
 
-    if (!expanded) {
+    if (!expanded)
+    {
         argv[(*argc)++] = token_start;
     }
     return 0;
@@ -754,7 +907,8 @@ static int finalize_parsed_token(tdsh_session_t *session,
 
 /* ---------- Generic stdin/stdout redirection ---------- */
 
-typedef struct {
+typedef struct
+{
     bool has_input;
     bool has_output;
     bool append_output;
@@ -765,47 +919,57 @@ typedef struct {
 /* Find the end of one shell word while preserving quotes/substitutions. */
 static int scan_redirection_word(const char *text, size_t start, size_t *end_out)
 {
-    if (!text || !end_out) return -EINVAL;
+    if (!text || !end_out)
+        return -EINVAL;
 
     bool single = false;
     bool dbl = false;
     bool escaped = false;
 
     size_t i = start;
-    for (; text[i]; ++i) {
+    for (; text[i]; ++i)
+    {
         char c = text[i];
 
-        if (escaped) {
+        if (escaped)
+        {
             escaped = false;
             continue;
         }
-        if (!single && c == '\\') {
+        if (!single && c == '\\')
+        {
             escaped = true;
             continue;
         }
-        if (!dbl && c == '\'') {
+        if (!dbl && c == '\'')
+        {
             single = !single;
             continue;
         }
-        if (!single && c == '"') {
+        if (!single && c == '"')
+        {
             dbl = !dbl;
             continue;
         }
 
-        if (!single && !dbl && c == '$' && text[i + 1U] == '(') {
+        if (!single && !dbl && c == '$' && text[i + 1U] == '(')
+        {
             size_t end = 0;
-            if (find_matching_paren(text, i + 1U, &end) != 0) return -EINVAL;
+            if (find_matching_paren(text, i + 1U, &end) != 0)
+                return -EINVAL;
             i = end;
             continue;
         }
 
         if (!single && !dbl &&
-            (isspace((unsigned char)c) || c == '<' || c == '>')) {
+            (isspace((unsigned char)c) || c == '<' || c == '>'))
+        {
             break;
         }
     }
 
-    if (single || dbl || escaped) return -EINVAL;
+    if (single || dbl || escaped)
+        return -EINVAL;
     *end_out = i;
     return 0;
 }
@@ -820,10 +984,12 @@ static int expand_redirection_target(tdsh_session_t *session,
     int argc = 0;
 
     int rc = tdsh_parse_words(session, expr,
-                                storage, sizeof(storage),
-                                argv, &argc);
-    if (rc != 0) return rc;
-    if (argc != 1) return argc > 1 ? -E2BIG : -EINVAL;
+                              storage, sizeof(storage),
+                              argv, &argc);
+    if (rc != 0)
+        return rc;
+    if (argc != 1)
+        return argc > 1 ? -E2BIG : -EINVAL;
 
     int written = snprintf(out, out_size, "%s", argv[0]);
     return (written < 0 || (size_t)written >= out_size)
@@ -842,7 +1008,8 @@ static int extract_redirections(tdsh_session_t *session,
                                 size_t clean_size,
                                 shell_redir_t *redir)
 {
-    if (!session || !segment || !clean || clean_size == 0 || !redir) {
+    if (!session || !segment || !clean || clean_size == 0 || !redir)
+    {
         return -EINVAL;
     }
 
@@ -853,68 +1020,87 @@ static int extract_redirections(tdsh_session_t *session,
     bool dbl = false;
     bool escaped = false;
 
-    for (size_t i = 0; segment[i]; ++i) {
+    for (size_t i = 0; segment[i]; ++i)
+    {
         char c = segment[i];
 
-        if (escaped) {
-            if (out_len + 1U >= clean_size) return -ENOSPC;
+        if (escaped)
+        {
+            if (out_len + 1U >= clean_size)
+                return -ENOSPC;
             clean[out_len++] = c;
             escaped = false;
             continue;
         }
 
-        if (!single && c == '\\') {
-            if (out_len + 1U >= clean_size) return -ENOSPC;
+        if (!single && c == '\\')
+        {
+            if (out_len + 1U >= clean_size)
+                return -ENOSPC;
             clean[out_len++] = c;
             escaped = true;
             continue;
         }
 
-        if (!dbl && c == '\'') {
+        if (!dbl && c == '\'')
+        {
             single = !single;
-            if (out_len + 1U >= clean_size) return -ENOSPC;
+            if (out_len + 1U >= clean_size)
+                return -ENOSPC;
             clean[out_len++] = c;
             continue;
         }
 
-        if (!single && c == '"') {
+        if (!single && c == '"')
+        {
             dbl = !dbl;
-            if (out_len + 1U >= clean_size) return -ENOSPC;
+            if (out_len + 1U >= clean_size)
+                return -ENOSPC;
             clean[out_len++] = c;
             continue;
         }
 
-        if (!single && !dbl && c == '$' && segment[i + 1U] == '(') {
+        if (!single && !dbl && c == '$' && segment[i + 1U] == '(')
+        {
             size_t end = 0;
-            if (find_matching_paren(segment, i + 1U, &end) != 0) return -EINVAL;
+            if (find_matching_paren(segment, i + 1U, &end) != 0)
+                return -EINVAL;
             size_t n = end - i + 1U;
-            if (out_len + n >= clean_size) return -ENOSPC;
+            if (out_len + n >= clean_size)
+                return -ENOSPC;
             memcpy(clean + out_len, segment + i, n);
             out_len += n;
             i = end;
             continue;
         }
 
-        if (!single && !dbl && (c == '<' || c == '>')) {
+        if (!single && !dbl && (c == '<' || c == '>'))
+        {
             bool is_input = c == '<';
             bool append = (!is_input && segment[i + 1U] == '>');
-            if (append) i++;
+            if (append)
+                i++;
 
             if ((is_input && redir->has_input) ||
-                (!is_input && redir->has_output)) {
+                (!is_input && redir->has_output))
+            {
                 return -EINVAL; /* one input and one output redirection max */
             }
 
             size_t j = i + 1U;
-            while (segment[j] && isspace((unsigned char)segment[j])) j++;
-            if (!segment[j]) return -EINVAL;
+            while (segment[j] && isspace((unsigned char)segment[j]))
+                j++;
+            if (!segment[j])
+                return -EINVAL;
 
             size_t end = 0;
             int rc = scan_redirection_word(segment, j, &end);
-            if (rc != 0 || end == j) return -EINVAL;
+            if (rc != 0 || end == j)
+                return -EINVAL;
 
             size_t expr_len = end - j;
-            if (expr_len > TDSH_MAX_LINE) return -ENAMETOOLONG;
+            if (expr_len > TDSH_MAX_LINE)
+                return -ENAMETOOLONG;
 
             char expr[TDSH_MAX_LINE + 1];
             memcpy(expr, segment + j, expr_len);
@@ -923,18 +1109,24 @@ static int extract_redirections(tdsh_session_t *session,
             char *target = is_input ? redir->input_path : redir->output_path;
             rc = expand_redirection_target(session, expr,
                                            target, TDSH_MAX_PATH);
-            if (rc != 0) return rc;
+            if (rc != 0)
+                return rc;
 
-            if (is_input) {
+            if (is_input)
+            {
                 redir->has_input = true;
-            } else {
+            }
+            else
+            {
                 redir->has_output = true;
                 redir->append_output = append;
             }
 
             /* Leave a separator so removing redirection never joins words. */
-            if (out_len > 0 && !isspace((unsigned char)clean[out_len - 1U])) {
-                if (out_len + 1U >= clean_size) return -ENOSPC;
+            if (out_len > 0 && !isspace((unsigned char)clean[out_len - 1U]))
+            {
+                if (out_len + 1U >= clean_size)
+                    return -ENOSPC;
                 clean[out_len++] = ' ';
             }
 
@@ -942,11 +1134,13 @@ static int extract_redirections(tdsh_session_t *session,
             continue;
         }
 
-        if (out_len + 1U >= clean_size) return -ENOSPC;
+        if (out_len + 1U >= clean_size)
+            return -ENOSPC;
         clean[out_len++] = c;
     }
 
-    if (single || dbl || escaped) return -EINVAL;
+    if (single || dbl || escaped)
+        return -EINVAL;
 
     clean[out_len] = '\0';
     trim_inplace(clean);
@@ -961,30 +1155,38 @@ static int open_shell_redirections(tdsh_session_t *session,
     *input_file = NULL;
     *output_file = NULL;
 
-    if (redir->has_input) {
+    if (redir->has_input)
+    {
         char real[TDSH_MAX_REAL_PATH];
         int rc = tdsh_path_to_real(session, redir->input_path,
-                                     real, sizeof(real), NULL, 0);
-        if (rc != 0) return rc;
+                                   real, sizeof(real), NULL, 0);
+        if (rc != 0)
+            return rc;
 
         *input_file = fopen(real, "rb");
-        if (!*input_file) return -errno;
+        if (!*input_file)
+            return -errno;
     }
 
-    if (redir->has_output) {
+    if (redir->has_output)
+    {
         char real[TDSH_MAX_REAL_PATH];
         int rc = tdsh_path_to_real(session, redir->output_path,
-                                     real, sizeof(real), NULL, 0);
-        if (rc != 0) {
-            if (*input_file) fclose(*input_file);
+                                   real, sizeof(real), NULL, 0);
+        if (rc != 0)
+        {
+            if (*input_file)
+                fclose(*input_file);
             *input_file = NULL;
             return rc;
         }
 
         *output_file = fopen(real, redir->append_output ? "ab" : "wb");
-        if (!*output_file) {
+        if (!*output_file)
+        {
             int saved = errno;
-            if (*input_file) fclose(*input_file);
+            if (*input_file)
+                fclose(*input_file);
             *input_file = NULL;
             return -saved;
         }
@@ -994,11 +1196,12 @@ static int open_shell_redirections(tdsh_session_t *session,
 }
 
 int tdsh_parse_words(tdsh_session_t *session,
-                       const char *input,
-                       char *storage, size_t storage_size,
-                       char **argv, int *argc_out)
+                     const char *input,
+                     char *storage, size_t storage_size,
+                     char **argv, int *argc_out)
 {
-    if (!session || !input || !storage || !argv || !argc_out) return -EINVAL;
+    if (!session || !input || !storage || !argv || !argc_out)
+        return -EINVAL;
 
     size_t out_len = 0;
     int argc = 0;
@@ -1010,92 +1213,115 @@ int tdsh_parse_words(tdsh_session_t *session,
     char *token_start = NULL;
     storage[0] = '\0';
 
-#define START_TOKEN() do { \
-    if (!token_started) { \
-        if (argc >= TDSH_MAX_ARGS) return -E2BIG; \
-        token_start = storage + out_len; \
-        argv[argc++] = token_start; \
-        token_started = true; \
-        token_wildcard_unquoted = false; \
-    } \
-} while (0)
+#define START_TOKEN()                        \
+    do                                       \
+    {                                        \
+        if (!token_started)                  \
+        {                                    \
+            if (argc >= TDSH_MAX_ARGS)       \
+                return -E2BIG;               \
+            token_start = storage + out_len; \
+            argv[argc++] = token_start;      \
+            token_started = true;            \
+            token_wildcard_unquoted = false; \
+        }                                    \
+    } while (0)
 
-#define FINISH_TOKEN() do { \
-    if (token_started) { \
-        int _rc = finalize_parsed_token(session, \
-                                        storage, storage_size, &out_len, \
-                                        argv, &argc, token_start, \
-                                        token_wildcard_unquoted); \
-        if (_rc != 0) return _rc; \
-        token_started = false; \
-        token_start = NULL; \
-        token_wildcard_unquoted = false; \
-    } \
-} while (0)
+#define FINISH_TOKEN()                                                       \
+    do                                                                       \
+    {                                                                        \
+        if (token_started)                                                   \
+        {                                                                    \
+            int _rc = finalize_parsed_token(session,                         \
+                                            storage, storage_size, &out_len, \
+                                            argv, &argc, token_start,        \
+                                            token_wildcard_unquoted);        \
+            if (_rc != 0)                                                    \
+                return _rc;                                                  \
+            token_started = false;                                           \
+            token_start = NULL;                                              \
+            token_wildcard_unquoted = false;                                 \
+        }                                                                    \
+    } while (0)
 
-    for (size_t i = 0;; ++i) {
+    for (size_t i = 0;; ++i)
+    {
         char c = input[i];
         bool at_end = (c == '\0');
 
-        if (escaped && !at_end) {
+        if (escaped && !at_end)
+        {
             START_TOKEN();
             int rc = append_char(storage, storage_size, &out_len, c);
-            if (rc != 0) return rc;
+            if (rc != 0)
+                return rc;
             escaped = false;
             continue;
         }
 
-        if (!single && !at_end && c == '\\') {
+        if (!single && !at_end && c == '\\')
+        {
             START_TOKEN();
             escaped = true;
             continue;
         }
 
-        if (!dbl && !at_end && c == '\'') {
+        if (!dbl && !at_end && c == '\'')
+        {
             START_TOKEN();
             single = !single;
             continue;
         }
 
-        if (!single && !at_end && c == '"') {
+        if (!single && !at_end && c == '"')
+        {
             START_TOKEN();
             dbl = !dbl;
             continue;
         }
 
-        if (!single && !at_end && c == '$') {
+        if (!single && !at_end && c == '$')
+        {
             /* Arithmetic expansion: $(( expression )) */
-            if (input[i + 1U] == '(' && input[i + 2U] == '(') {
+            if (input[i + 1U] == '(' && input[i + 2U] == '(')
+            {
                 size_t end = 0;
                 if (find_matching_paren(input, i + 1U, &end) != 0 ||
-                    end <= i + 3U || input[end - 1U] != ')') {
+                    end <= i + 3U || input[end - 1U] != ')')
+                {
                     return -EINVAL;
                 }
                 size_t expr_len = end - i - 4U;
                 char expr[TDSH_MAX_LINE + 1];
-                if (expr_len >= sizeof(expr)) return -ENOSPC;
+                if (expr_len >= sizeof(expr))
+                    return -ENOSPC;
                 memcpy(expr, input + i + 3U, expr_len);
                 expr[expr_len] = '\0';
 
                 int64_t value = 0;
                 int rc = tdsh_eval_int_expr(session, expr, &value);
-                if (rc != 0) return rc;
+                if (rc != 0)
+                    return rc;
                 char number[32];
                 snprintf(number, sizeof(number), "%lld", (long long)value);
                 START_TOKEN();
                 rc = append_text(storage, storage_size, &out_len, number);
-                if (rc != 0) return rc;
+                if (rc != 0)
+                    return rc;
                 i = end;
                 continue;
             }
 
             /* Modern command substitution: $( command ) */
-            if (input[i + 1U] == '(') {
+            if (input[i + 1U] == '(')
+            {
                 size_t end = 0;
-                if (find_matching_paren(input, i + 1U, &end) != 0) return -EINVAL;
+                if (find_matching_paren(input, i + 1U, &end) != 0)
+                    return -EINVAL;
                 size_t n = end - i - 2U;
                 char *inner = tdsh_malloc(n + 1U);
-                if (!inner) return -ENOMEM;
+                if (!inner)
+                    return -ENOMEM;
                 memcpy(inner, input + i + 2U, n);
                 inner[n] = '\0';
 
@@ -1104,15 +1330,18 @@ int tdsh_parse_words(tdsh_session_t *session,
                 int rc = capture_execute_subshell(session, inner, NULL,
                                                   &captured, &sub_status);
                 tdsh_free(inner);
-                if (rc != 0) return rc;
+                if (rc != 0)
+                    return rc;
                 normalize_substitution_output(captured);
                 START_TOKEN();
-                if (!dbl && contains_glob_chars(captured)) {
+                if (!dbl && contains_glob_chars(captured))
+                {
                     token_wildcard_unquoted = true;
                 }
                 rc = append_text(storage, storage_size, &out_len, captured);
                 tdsh_free(captured);
-                if (rc != 0) return rc;
+                if (rc != 0)
+                    return rc;
                 i = end;
                 continue;
             }
@@ -1121,66 +1350,85 @@ int tdsh_parse_words(tdsh_session_t *session,
             size_t nlen = 0;
             size_t end = i;
 
-            if (input[i + 1U] == '{') {
+            if (input[i + 1U] == '{')
+            {
                 size_t j = i + 2U;
-                while (input[j] && input[j] != '}' && nlen + 1U < sizeof(name)) {
+                while (input[j] && input[j] != '}' && nlen + 1U < sizeof(name))
+                {
                     name[nlen++] = input[j++];
                 }
-                if (input[j] != '}') return -EINVAL;
+                if (input[j] != '}')
+                    return -EINVAL;
                 end = j;
-            } else if (input[i + 1U] == '?' || input[i + 1U] == '#') {
+            }
+            else if (input[i + 1U] == '?' || input[i + 1U] == '#')
+            {
                 name[nlen++] = input[i + 1U];
                 end = i + 1U;
-            } else if (isdigit((unsigned char)input[i + 1U])) {
+            }
+            else if (isdigit((unsigned char)input[i + 1U]))
+            {
                 size_t j = i + 1U;
-                while (isdigit((unsigned char)input[j]) && nlen + 1U < sizeof(name)) {
+                while (isdigit((unsigned char)input[j]) && nlen + 1U < sizeof(name))
+                {
                     name[nlen++] = input[j++];
                 }
                 end = j - 1U;
-            } else if (is_var_name_start(input[i + 1U])) {
+            }
+            else if (is_var_name_start(input[i + 1U]))
+            {
                 size_t j = i + 1U;
                 while (input[j] && is_var_name_char(input[j]) &&
-                       nlen + 1U < sizeof(name)) {
+                       nlen + 1U < sizeof(name))
+                {
                     name[nlen++] = input[j++];
                 }
                 end = j - 1U;
             }
 
-            if (nlen > 0) {
+            if (nlen > 0)
+            {
                 name[nlen] = '\0';
                 char special[64];
                 const char *value = resolve_named_value(session, name,
                                                         special, sizeof(special));
                 START_TOKEN();
-                if (!dbl && contains_glob_chars(value ? value : "")) {
+                if (!dbl && contains_glob_chars(value ? value : ""))
+                {
                     token_wildcard_unquoted = true;
                 }
                 int rc = append_text(storage, storage_size, &out_len,
                                      value ? value : "");
-                if (rc != 0) return rc;
+                if (rc != 0)
+                    return rc;
                 i = end;
                 continue;
             }
         }
 
-        if (at_end || (!single && !dbl && isspace((unsigned char)c))) {
+        if (at_end || (!single && !dbl && isspace((unsigned char)c)))
+        {
             FINISH_TOKEN();
-            if (at_end) break;
+            if (at_end)
+                break;
             continue;
         }
 
         START_TOKEN();
-        if (!single && !dbl && (c == '*' || c == '?')) {
+        if (!single && !dbl && (c == '*' || c == '?'))
+        {
             token_wildcard_unquoted = true;
         }
         int rc = append_char(storage, storage_size, &out_len, c);
-        if (rc != 0) return rc;
+        if (rc != 0)
+            return rc;
     }
 
 #undef FINISH_TOKEN
 #undef START_TOKEN
 
-    if (dbl || single || escaped) return -EINVAL;
+    if (dbl || single || escaped)
+        return -EINVAL;
     *argc_out = argc;
     return 0;
 }
@@ -1188,21 +1436,27 @@ int tdsh_parse_words(tdsh_session_t *session,
 static bool valid_assignment(const char *arg, const char **eq_out)
 {
     const char *eq = strchr(arg, '=');
-    if (!eq || eq == arg || !is_var_name_start(arg[0])) return false;
-    for (const char *p = arg + 1; p < eq; ++p) {
-        if (!is_var_name_char(*p)) return false;
+    if (!eq || eq == arg || !is_var_name_start(arg[0]))
+        return false;
+    for (const char *p = arg + 1; p < eq; ++p)
+    {
+        if (!is_var_name_char(*p))
+            return false;
     }
-    if (eq_out) *eq_out = eq;
+    if (eq_out)
+        *eq_out = eq;
     return true;
 }
 
 static int set_assignment(tdsh_session_t *session, const char *arg)
 {
     const char *eq = NULL;
-    if (!valid_assignment(arg, &eq)) return -EINVAL;
+    if (!valid_assignment(arg, &eq))
+        return -EINVAL;
     size_t name_len = (size_t)(eq - arg);
     char name[TDSH_VAR_NAME_MAX];
-    if (name_len >= sizeof(name)) return -ENOSPC;
+    if (name_len >= sizeof(name))
+        return -ENOSPC;
     memcpy(name, arg, name_len);
     name[name_len] = '\0';
     return tdsh_var_set(session, name, eq + 1U);
@@ -1215,7 +1469,8 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
 
     int rc = extract_redirections(session, segment,
                                   clean, sizeof(clean), &redir);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         printf("tdsh: redirection parse error: %s\n",
                strerror(rc < 0 ? -rc : rc));
         return 2;
@@ -1226,8 +1481,9 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
     int argc = 0;
 
     rc = tdsh_parse_words(session, clean, storage, sizeof(storage),
-                            argv, &argc);
-    if (rc != 0) {
+                          argv, &argc);
+    if (rc != 0)
+    {
         printf("tdsh: parse error (%d)\n", rc);
         return 2;
     }
@@ -1238,13 +1494,16 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
     FILE *old_out = stdout;
 
     rc = open_shell_redirections(session, &redir, &redir_in, &redir_out);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         printf("tdsh: redirection: %s\n", strerror(-rc));
         return 1;
     }
 
-    if (redir_in) stdin = redir_in;
-    if (redir_out) {
+    if (redir_in)
+        stdin = redir_in;
+    if (redir_out)
+    {
         stdout = redir_out;
         setvbuf(stdout, NULL, _IONBF, 0);
     }
@@ -1255,23 +1514,29 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
      * A redirection-only command is useful for creating/truncating a file:
      *     > empty.txt
      */
-    if (argc == 0) {
+    if (argc == 0)
+    {
         status = 0;
         goto done;
     }
 
     bool assignments = true;
-    for (int i = 0; i < argc; ++i) {
-        if (!valid_assignment(argv[i], NULL)) {
+    for (int i = 0; i < argc; ++i)
+    {
+        if (!valid_assignment(argv[i], NULL))
+        {
             assignments = false;
             break;
         }
     }
 
-    if (assignments) {
-        for (int i = 0; i < argc; ++i) {
+    if (assignments)
+    {
+        for (int i = 0; i < argc; ++i)
+        {
             rc = set_assignment(session, argv[i]);
-            if (rc != 0) {
+            if (rc != 0)
+            {
                 printf("tdsh: cannot set variable (%d)\n", rc);
                 status = 1;
                 goto done;
@@ -1282,45 +1547,58 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
     }
 
     /* Lightweight language built-ins that do not need command-table entries. */
-    if (strcmp(argv[0], "true") == 0 && argc == 1) {
+    if (strcmp(argv[0], "true") == 0 && argc == 1)
+    {
         status = 0;
         goto done;
     }
-    if (strcmp(argv[0], "false") == 0 && argc == 1) {
+    if (strcmp(argv[0], "false") == 0 && argc == 1)
+    {
         status = 1;
         goto done;
     }
 
     /* Shell-compatible stdin passthrough used by pipes and '< file'. */
-    if (strcmp(argv[0], "cat") == 0 && argc == 1) {
+    if (strcmp(argv[0], "cat") == 0 && argc == 1)
+    {
         char buf[256];
         size_t n;
         status = 0;
-        while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0) {
-            if (fwrite(buf, 1, n, stdout) != n) {
+        while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
+        {
+            if (fwrite(buf, 1, n, stdout) != n)
+            {
                 status = 1;
                 break;
             }
         }
-        if (ferror(stdin)) status = 1;
+        if (ferror(stdin))
+            status = 1;
         goto done;
     }
 
-    if (strcmp(argv[0], "export") == 0) {
-        if (argc < 2) {
+    if (strcmp(argv[0], "export") == 0)
+    {
+        if (argc < 2)
+        {
             printf("usage: export NAME=value [...]\n");
             status = 2;
             goto done;
         }
         status = 0;
-        for (int i = 1; i < argc; ++i) {
-            if (valid_assignment(argv[i], NULL)) {
+        for (int i = 1; i < argc; ++i)
+        {
+            if (valid_assignment(argv[i], NULL))
+            {
                 rc = set_assignment(session, argv[i]);
-            } else {
+            }
+            else
+            {
                 const char *value = tdsh_var_get(session, argv[i]);
                 rc = value ? 0 : -ENOENT;
             }
-            if (rc != 0) {
+            if (rc != 0)
+            {
                 printf("export: invalid variable: %s\n", argv[i]);
                 status = 1;
                 break;
@@ -1331,21 +1609,27 @@ static int execute_segment(tdsh_session_t *session, const char *segment)
 
     {
         int function_status = 0;
-        if (tdsh_script_try_function(session, argc, argv, &function_status)) {
+        if (tdsh_script_try_function(session, argc, argv, &function_status))
+        {
             status = function_status;
-        } else {
+        }
+        else
+        {
             status = tdsh_execute_argv(session, argc, argv);
         }
     }
 
 done:
-    if (redir_out) fflush(redir_out);
+    if (redir_out)
+        fflush(redir_out);
 
     stdin = old_in;
     stdout = old_out;
 
-    if (redir_out) fclose(redir_out);
-    if (redir_in) fclose(redir_in);
+    if (redir_out)
+        fclose(redir_out);
+    if (redir_in)
+        fclose(redir_in);
 
     return status;
 }
@@ -1357,30 +1641,54 @@ static int split_pipeline(char *buffer, char **stages, int *count_out)
     stages[0] = buffer;
     bool single = false, dbl = false, escaped = false;
 
-    for (size_t i = 0; buffer[i]; ++i) {
+    for (size_t i = 0; buffer[i]; ++i)
+    {
         char c = buffer[i];
-        if (escaped) { escaped = false; continue; }
-        if (c == '\\' && !single) { escaped = true; continue; }
-        if (!dbl && c == '\'') { single = !single; continue; }
-        if (!single && c == '"') { dbl = !dbl; continue; }
-        if (single) continue;
+        if (escaped)
+        {
+            escaped = false;
+            continue;
+        }
+        if (c == '\\' && !single)
+        {
+            escaped = true;
+            continue;
+        }
+        if (!dbl && c == '\'')
+        {
+            single = !single;
+            continue;
+        }
+        if (!single && c == '"')
+        {
+            dbl = !dbl;
+            continue;
+        }
+        if (single)
+            continue;
 
-        if (c == '$' && buffer[i + 1U] == '(') {
+        if (c == '$' && buffer[i + 1U] == '(')
+        {
             size_t end = 0;
-            if (find_matching_paren(buffer, i + 1U, &end) != 0) return -EINVAL;
+            if (find_matching_paren(buffer, i + 1U, &end) != 0)
+                return -EINVAL;
             i = end;
             continue;
         }
 
-        if (!dbl && c == '|' && buffer[i + 1U] != '|') {
-            if (count >= USCRIPT_PIPE_MAX_STAGES) return -E2BIG;
+        if (!dbl && c == '|' && buffer[i + 1U] != '|')
+        {
+            if (count >= USCRIPT_PIPE_MAX_STAGES)
+                return -E2BIG;
             buffer[i] = '\0';
             stages[count++] = buffer + i + 1U;
         }
     }
 
-    if (single || dbl || escaped) return -EINVAL;
-    for (int i = 0; i < count; ++i) trim_inplace(stages[i]);
+    if (single || dbl || escaped)
+        return -EINVAL;
+    for (int i = 0; i < count; ++i)
+        trim_inplace(stages[i]);
     *count_out = count;
     return 0;
 }
@@ -1388,23 +1696,28 @@ static int split_pipeline(char *buffer, char **stages, int *count_out)
 static int execute_pipeline(tdsh_session_t *session, const char *segment)
 {
     char buffer[TDSH_MAX_LINE + 1];
-    if (snprintf(buffer, sizeof(buffer), "%s", segment) >= (int)sizeof(buffer)) {
+    if (snprintf(buffer, sizeof(buffer), "%s", segment) >= (int)sizeof(buffer))
+    {
         return 2;
     }
 
     char *stages[USCRIPT_PIPE_MAX_STAGES];
     int count = 0;
     int rc = split_pipeline(buffer, stages, &count);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         printf("tdsh: pipeline parse error (%d)\n", rc);
         return 2;
     }
-    if (count == 1) return execute_segment(session, stages[0]);
+    if (count == 1)
+        return execute_segment(session, stages[0]);
 
     char *input = NULL;
     int status = 0;
-    for (int i = 0; i < count; ++i) {
-        if (!stages[i][0]) {
+    for (int i = 0; i < count; ++i)
+    {
+        if (!stages[i][0])
+        {
             tdsh_free(input);
             printf("tdsh: empty pipeline stage\n");
             return 2;
@@ -1414,7 +1727,8 @@ static int execute_pipeline(tdsh_session_t *session, const char *segment)
         rc = capture_execute(session, stages[i], input, &output, &status);
         tdsh_free(input);
         input = NULL;
-        if (rc != 0) {
+        if (rc != 0)
+        {
             printf("tdsh: pipeline capture failed: %s\n", strerror(-rc));
             tdsh_free(output);
             return 1;
@@ -1422,12 +1736,14 @@ static int execute_pipeline(tdsh_session_t *session, const char *segment)
         input = output;
     }
 
-    if (input && input[0]) fputs(input, stdout);
+    if (input && input[0])
+        fputs(input, stdout);
     tdsh_free(input);
     return status;
 }
 
-typedef enum {
+typedef enum
+{
     OP_ALWAYS = 0,
     OP_AND,
     OP_OR,
@@ -1435,10 +1751,13 @@ typedef enum {
 
 int tdsh_execute_line(tdsh_session_t *session, const char *line)
 {
-    if (!session || !line) return 2;
+    if (!session || !line)
+        return 2;
 
-    while (*line && isspace((unsigned char)*line)) line++;
-    if (*line == '\0' || *line == '#') return 0;
+    while (*line && isspace((unsigned char)*line))
+        line++;
+    if (*line == '\0' || *line == '#')
+        return 0;
 
     char segment[TDSH_MAX_LINE + 1];
     size_t seg_len = 0;
@@ -1447,43 +1766,55 @@ int tdsh_execute_line(tdsh_session_t *session, const char *line)
     int last_status = session->last_status;
     bool executed_any = false;
 
-    for (size_t i = 0;; ++i) {
+    for (size_t i = 0;; ++i)
+    {
         char c = line[i];
         bool at_end = (c == '\0');
 
-        if (escaped && !at_end) {
-            if (seg_len >= TDSH_MAX_LINE) return 2;
+        if (escaped && !at_end)
+        {
+            if (seg_len >= TDSH_MAX_LINE)
+                return 2;
             segment[seg_len++] = c;
             escaped = false;
             continue;
         }
-        if (!single && !at_end && c == '\\') {
-            if (seg_len >= TDSH_MAX_LINE) return 2;
+        if (!single && !at_end && c == '\\')
+        {
+            if (seg_len >= TDSH_MAX_LINE)
+                return 2;
             segment[seg_len++] = c;
             escaped = true;
             continue;
         }
-        if (!dbl && !at_end && c == '\'') {
+        if (!dbl && !at_end && c == '\'')
+        {
             single = !single;
-            if (seg_len >= TDSH_MAX_LINE) return 2;
+            if (seg_len >= TDSH_MAX_LINE)
+                return 2;
             segment[seg_len++] = c;
             continue;
         }
-        if (!single && !at_end && c == '"') {
+        if (!single && !at_end && c == '"')
+        {
             dbl = !dbl;
-            if (seg_len >= TDSH_MAX_LINE) return 2;
+            if (seg_len >= TDSH_MAX_LINE)
+                return 2;
             segment[seg_len++] = c;
             continue;
         }
 
-        if (!single && !at_end && c == '$' && line[i + 1U] == '(') {
+        if (!single && !at_end && c == '$' && line[i + 1U] == '(')
+        {
             size_t end = 0;
-            if (find_matching_paren(line, i + 1U, &end) != 0) {
+            if (find_matching_paren(line, i + 1U, &end) != 0)
+            {
                 printf("tdsh: unmatched command/arithmetic substitution\n");
                 return 2;
             }
             size_t n = end - i + 1U;
-            if (seg_len + n > TDSH_MAX_LINE) return 2;
+            if (seg_len + n > TDSH_MAX_LINE)
+                return 2;
             memcpy(segment + seg_len, line + i, n);
             seg_len += n;
             i = end;
@@ -1492,7 +1823,8 @@ int tdsh_execute_line(tdsh_session_t *session, const char *line)
 
         bool comment = (!at_end && !single && !dbl && c == '#' &&
                         (i == 0 || isspace((unsigned char)line[i - 1U])));
-        if (comment) {
+        if (comment)
+        {
             c = '\0';
             at_end = true;
         }
@@ -1501,42 +1833,51 @@ int tdsh_execute_line(tdsh_session_t *session, const char *line)
         bool and_op = (!at_end && !single && !dbl && c == '&' && line[i + 1U] == '&');
         bool or_op = (!at_end && !single && !dbl && c == '|' && line[i + 1U] == '|');
 
-        if (at_end || semicolon || and_op || or_op) {
+        if (at_end || semicolon || and_op || or_op)
+        {
             segment[seg_len] = '\0';
             trim_inplace(segment);
 
-            if (segment[0]) {
+            if (segment[0])
+            {
                 bool run = (op == OP_ALWAYS) ||
                            (op == OP_AND && last_status == 0) ||
                            (op == OP_OR && last_status != 0);
-                if (run) {
+                if (run)
+                {
                     last_status = execute_pipeline(session, segment);
                     session->last_status = last_status;
                     executed_any = true;
-                    if (session->logout_requested) return last_status;
+                    if (session->logout_requested)
+                        return last_status;
                 }
             }
 
             seg_len = 0;
-            if (at_end) break;
+            if (at_end)
+                break;
             op = and_op ? OP_AND : (or_op ? OP_OR : OP_ALWAYS);
-            if (and_op || or_op) i++;
+            if (and_op || or_op)
+                i++;
             continue;
         }
 
-        if (seg_len >= TDSH_MAX_LINE) {
+        if (seg_len >= TDSH_MAX_LINE)
+        {
             printf("tdsh: command too long\n");
             return 2;
         }
         segment[seg_len++] = c;
     }
 
-    if (single || dbl || escaped) {
+    if (single || dbl || escaped)
+    {
         printf("tdsh: unmatched quote or escape\n");
         session->last_status = 2;
         return 2;
     }
 
-    if (!executed_any) return 0;
+    if (!executed_any)
+        return 0;
     return last_status;
 }

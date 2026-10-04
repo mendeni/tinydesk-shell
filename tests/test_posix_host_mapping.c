@@ -6,7 +6,15 @@
 #include <string.h>
 #include <unistd.h>
 
-#define CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); return 1; } } while (0)
+#define CHECK(cond, msg)                        \
+    do                                          \
+    {                                           \
+        if (!(cond))                            \
+        {                                       \
+            fprintf(stderr, "FAIL: %s\n", msg); \
+            return 1;                           \
+        }                                       \
+    } while (0)
 
 int main(void)
 {
@@ -34,7 +42,8 @@ int main(void)
 
     char expected[TDSH_MAX_REAL_PATH];
     snprintf(expected, sizeof(expected), "%s/home/alice/isolated.txt", root);
-    if (strcmp(real, expected) != 0) {
+    if (strcmp(real, expected) != 0)
+    {
         fprintf(stderr, "FAIL: expected %s got %s\n", expected, real);
         return 1;
     }

@@ -3,7 +3,15 @@
 
 /* Exercise the actual shared-console policy, including both takeover orders.
  * Avoid assert(): release builds must execute every security check. */
-#define CHECK(expr) do { if (!(expr)) { fprintf(stderr, "line %d: %s\n", __LINE__, #expr); return 1; } } while (0)
+#define CHECK(expr)                                            \
+    do                                                         \
+    {                                                          \
+        if (!(expr))                                           \
+        {                                                      \
+            fprintf(stderr, "line %d: %s\n", __LINE__, #expr); \
+            return 1;                                          \
+        }                                                      \
+    } while (0)
 int main(void)
 {
     tdsh_console_access_t access = TDSH_ACCESS_LOCAL;

@@ -20,11 +20,11 @@
 
 static const char *TAG = "tdsh-ftp";
 
-#define TDSH_FTP_LISTENER_STACK_SIZE   6144U
-#define TDSH_FTP_CLIENT_STACK_SIZE     10240U
-#define TDSH_FTP_TRANSFER_BUF_SIZE     4096U
-#define TDSH_FTP_MAX_CLIENTS           1U
-#define TDSH_FTP_DATA_TIMEOUT_SEC      20
+#define TDSH_FTP_LISTENER_STACK_SIZE 6144U
+#define TDSH_FTP_CLIENT_STACK_SIZE   10240U
+#define TDSH_FTP_TRANSFER_BUF_SIZE   4096U
+#define TDSH_FTP_MAX_CLIENTS         1U
+#define TDSH_FTP_DATA_TIMEOUT_SEC    20
 
 static volatile bool s_running;
 static int s_listen_fd = -1;
@@ -39,7 +39,8 @@ static unsigned s_client_count;
 static volatile UBaseType_t s_listener_stack_min;
 static volatile UBaseType_t s_client_stack_min;
 
-typedef struct {
+typedef struct
+{
     int ctrl;
     int pasv;
     char cwd[TDSH_MAX_PATH];
@@ -48,20 +49,25 @@ typedef struct {
     char rename_from[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 16];
 } ftp_client_t;
 
-typedef struct {
+typedef struct
+{
     int fd;
 } ftp_client_task_arg_t;
 
 static int send_all(int fd, const void *data, size_t len)
 {
     const char *p = (const char *)data;
-    while (len > 0) {
+    while (len > 0)
+    {
         int n = send(fd, p, len, 0);
-        if (n < 0) {
-            if (errno == EINTR) continue;
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
             return -1;
         }
-        if (n == 0) return -1;
+        if (n == 0)
+            return -1;
         p += n;
         len -= (size_t)n;
     }
@@ -75,7 +81,8 @@ static void replyf(int fd, const char *fmt, ...)
     va_start(ap, fmt);
     int n = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
-    if (n < 0) return;
+    if (n < 0)
+        return;
     size_t len = (size_t)n < sizeof(buf) ? (size_t)n : sizeof(buf) - 1U;
     (void)send_all(fd, buf, len);
 }
@@ -83,17 +90,24 @@ static void replyf(int fd, const char *fmt, ...)
 static int recv_line(int fd, char *buf, size_t size)
 {
     size_t n = 0;
-    while (n + 1U < size && s_running) {
+    while (n + 1U < size && s_running)
+    {
         char c;
         int r = recv(fd, &c, 1, 0);
-        if (r == 0) return 0;
-        if (r < 0) {
-            if (errno == EINTR) continue;
-            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+        if (r == 0)
+            return 0;
+        if (r < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                continue;
             return -1;
         }
-        if (c == '\n') break;
-        if (c != '\r') buf[n++] = c;
+        if (c == '\n')
+            break;
+        if (c != '\r')
+            buf[n++] = c;
     }
     buf[n] = '\0';
     return (int)n;
@@ -103,9 +117,12 @@ static void ftp_fake_session(const ftp_client_t *c, tdsh_session_t *s)
 {
     memset(s, 0, sizeof(*s));
     snprintf(s->username, sizeof(s->username), "%s", c->username[0] ? c->username : "root");
-    if (strcmp(s->username, "root") == 0) {
+    if (strcmp(s->username, "root") == 0)
+    {
         snprintf(s->home, sizeof(s->home), "/root");
-    } else {
+    }
+    else
+    {
         snprintf(s->home, sizeof(s->home), "/home/%s", s->username);
     }
     snprintf(s->cwd, sizeof(s->cwd), "%s", c->cwd);
@@ -116,7 +133,8 @@ static int ftp_path(ftp_client_t *c, const char *input,
                     char *logical, size_t lsize)
 {
     tdsh_session_t *s = calloc(1, sizeof(*s));
-    if (!s) {
+    if (!s)
+    {
         ESP_LOGE(TAG, "unable to allocate FTP path session (%u bytes)",
                  (unsigned)sizeof(*s));
         return -1;
@@ -124,8 +142,8 @@ static int ftp_path(ftp_client_t *c, const char *input,
 
     ftp_fake_session(c, s);
     int rc = tdsh_path_to_real(s,
-                                 (input && input[0]) ? input : ".",
-                                 real, rsize, logical, lsize);
+                               (input && input[0]) ? input : ".",
+                               real, rsize, logical, lsize);
     free(s);
     return rc;
 }
@@ -136,7 +154,8 @@ static void *ftp_transfer_alloc(size_t size)
 #ifdef CONFIG_SPIRAM
     p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #endif
-    if (!p) p = heap_caps_malloc(size, MALLOC_CAP_8BIT);
+    if (!p)
+        p = heap_caps_malloc(size, MALLOC_CAP_8BIT);
     return p;
 }
 
@@ -148,7 +167,8 @@ static void set_socket_timeout(int fd, int optname, int seconds)
 
 static void close_pasv(ftp_client_t *c)
 {
-    if (c->pasv >= 0) {
+    if (c->pasv >= 0)
+    {
         close(c->pasv);
         c->pasv = -1;
     }
@@ -159,7 +179,8 @@ static int open_passive(ftp_client_t *c, bool epsv)
     close_pasv(c);
 
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (fd < 0) return -1;
+    if (fd < 0)
+        return -1;
 
     int yes = 1;
     (void)setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -170,13 +191,15 @@ static int open_passive(ftp_client_t *c, bool epsv)
     addr.sin_port = 0;
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 ||
-        listen(fd, 1) != 0) {
+        listen(fd, 1) != 0)
+    {
         close(fd);
         return -1;
     }
 
     socklen_t alen = sizeof(addr);
-    if (getsockname(fd, (struct sockaddr *)&addr, &alen) != 0) {
+    if (getsockname(fd, (struct sockaddr *)&addr, &alen) != 0)
+    {
         close(fd);
         return -1;
     }
@@ -185,12 +208,16 @@ static int open_passive(ftp_client_t *c, bool epsv)
     c->pasv = fd;
 
     uint16_t port = ntohs(addr.sin_port);
-    if (epsv) {
+    if (epsv)
+    {
         replyf(c->ctrl, "229 Entering Extended Passive Mode (|||%u|)\r\n", port);
-    } else {
+    }
+    else
+    {
         struct sockaddr_in local = {0};
         socklen_t llen = sizeof(local);
-        if (getsockname(c->ctrl, (struct sockaddr *)&local, &llen) != 0) {
+        if (getsockname(c->ctrl, (struct sockaddr *)&local, &llen) != 0)
+        {
             close_pasv(c);
             return -1;
         }
@@ -211,7 +238,8 @@ static int open_passive(ftp_client_t *c, bool epsv)
 
 static int accept_data(ftp_client_t *c)
 {
-    if (c->pasv < 0) {
+    if (c->pasv < 0)
+    {
         replyf(c->ctrl, "425 Use PASV or EPSV first.\r\n");
         return -1;
     }
@@ -221,7 +249,8 @@ static int accept_data(ftp_client_t *c)
     int d = accept(c->pasv, (struct sockaddr *)&peer, &plen);
     close_pasv(c);
 
-    if (d < 0) {
+    if (d < 0)
+    {
         replyf(c->ctrl, "425 Cannot open data connection.\r\n");
         return -1;
     }
@@ -234,7 +263,8 @@ static int accept_data(ftp_client_t *c)
 static void list_one(int data, const char *real, const char *name)
 {
     struct stat st;
-    if (stat(real, &st) != 0) return;
+    if (stat(real, &st) != 0)
+        return;
 
     char line[512];
     int n = snprintf(line, sizeof(line),
@@ -242,7 +272,8 @@ static void list_one(int data, const char *real, const char *name)
                      S_ISDIR(st.st_mode) ? 'd' : '-',
                      (long)st.st_size,
                      name);
-    if (n > 0) {
+    if (n > 0)
+    {
         size_t len = (size_t)n < sizeof(line) ? (size_t)n : sizeof(line) - 1U;
         (void)send_all(data, line, len);
     }
@@ -254,45 +285,60 @@ static void do_list(ftp_client_t *c, const char *arg, bool names_only)
     char logical[TDSH_MAX_PATH];
 
     if (ftp_path(c, arg && arg[0] ? arg : ".",
-                 real, sizeof(real), logical, sizeof(logical)) != 0) {
+                 real, sizeof(real), logical, sizeof(logical)) != 0)
+    {
         replyf(c->ctrl, "550 Invalid path.\r\n");
         return;
     }
 
     struct stat st;
-    if (stat(real, &st) != 0) {
+    if (stat(real, &st) != 0)
+    {
         replyf(c->ctrl, "550 Path not found.\r\n");
         return;
     }
 
     replyf(c->ctrl, "150 Opening data connection.\r\n");
     int data = accept_data(c);
-    if (data < 0) return;
+    if (data < 0)
+        return;
 
-    if (S_ISDIR(st.st_mode)) {
+    if (S_ISDIR(st.st_mode))
+    {
         DIR *d = opendir(real);
-        if (d) {
+        if (d)
+        {
             struct dirent *e;
-            while ((e = readdir(d)) != NULL) {
-                if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            while ((e = readdir(d)) != NULL)
+            {
+                if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+                    continue;
 
-                if (names_only) {
+                if (names_only)
+                {
                     replyf(data, "%s\r\n", e->d_name);
-                } else {
+                }
+                else
+                {
                     char child[sizeof(real) + 64];
                     int n = snprintf(child, sizeof(child), "%s/%s", real, e->d_name);
-                    if (n > 0 && n < (int)sizeof(child)) {
+                    if (n > 0 && n < (int)sizeof(child))
+                    {
                         list_one(data, child, e->d_name);
                     }
                 }
             }
             closedir(d);
         }
-    } else {
+    }
+    else
+    {
         const char *name = strrchr(logical, '/');
         name = name ? name + 1 : logical;
-        if (names_only) replyf(data, "%s\r\n", name);
-        else list_one(data, real, name);
+        if (names_only)
+            replyf(data, "%s\r\n", name);
+        else
+            list_one(data, real, name);
     }
 
     shutdown(data, SHUT_RDWR);
@@ -303,26 +349,30 @@ static void do_list(ftp_client_t *c, const char *arg, bool names_only)
 static void do_retr(ftp_client_t *c, const char *arg)
 {
     char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
-    if (!arg || !arg[0] || ftp_path(c, arg, real, sizeof(real), NULL, 0) != 0) {
+    if (!arg || !arg[0] || ftp_path(c, arg, real, sizeof(real), NULL, 0) != 0)
+    {
         replyf(c->ctrl, "550 Invalid path.\r\n");
         return;
     }
 
     FILE *f = fopen(real, "rb");
-    if (!f) {
+    if (!f)
+    {
         replyf(c->ctrl, "550 File unavailable.\r\n");
         return;
     }
 
     replyf(c->ctrl, "150 Opening binary data connection.\r\n");
     int data = accept_data(c);
-    if (data < 0) {
+    if (data < 0)
+    {
         fclose(f);
         return;
     }
 
     char *buf = ftp_transfer_alloc(TDSH_FTP_TRANSFER_BUF_SIZE);
-    if (!buf) {
+    if (!buf)
+    {
         fclose(f);
         shutdown(data, SHUT_RDWR);
         close(data);
@@ -332,46 +382,55 @@ static void do_retr(ftp_client_t *c, const char *arg)
 
     bool ok = true;
     size_t n;
-    while ((n = fread(buf, 1, TDSH_FTP_TRANSFER_BUF_SIZE, f)) > 0) {
-        if (send_all(data, buf, n) != 0) {
+    while ((n = fread(buf, 1, TDSH_FTP_TRANSFER_BUF_SIZE, f)) > 0)
+    {
+        if (send_all(data, buf, n) != 0)
+        {
             ok = false;
             break;
         }
     }
-    if (ferror(f)) ok = false;
+    if (ferror(f))
+        ok = false;
 
     free(buf);
     fclose(f);
     shutdown(data, SHUT_RDWR);
     close(data);
 
-    if (ok) replyf(c->ctrl, "226 Transfer complete.\r\n");
-    else replyf(c->ctrl, "426 Data connection error; transfer aborted.\r\n");
+    if (ok)
+        replyf(c->ctrl, "226 Transfer complete.\r\n");
+    else
+        replyf(c->ctrl, "426 Data connection error; transfer aborted.\r\n");
 }
 
 static void do_stor(ftp_client_t *c, const char *arg)
 {
     char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
-    if (!arg || !arg[0] || ftp_path(c, arg, real, sizeof(real), NULL, 0) != 0) {
+    if (!arg || !arg[0] || ftp_path(c, arg, real, sizeof(real), NULL, 0) != 0)
+    {
         replyf(c->ctrl, "550 Invalid path.\r\n");
         return;
     }
 
     FILE *f = fopen(real, "wb");
-    if (!f) {
+    if (!f)
+    {
         replyf(c->ctrl, "550 Cannot create file.\r\n");
         return;
     }
 
     replyf(c->ctrl, "150 Opening binary data connection.\r\n");
     int data = accept_data(c);
-    if (data < 0) {
+    if (data < 0)
+    {
         fclose(f);
         return;
     }
 
     char *buf = ftp_transfer_alloc(TDSH_FTP_TRANSFER_BUF_SIZE);
-    if (!buf) {
+    if (!buf)
+    {
         fclose(f);
         shutdown(data, SHUT_RDWR);
         close(data);
@@ -380,38 +439,47 @@ static void do_stor(ftp_client_t *c, const char *arg)
     }
 
     bool ok = true;
-    for (;;) {
+    for (;;)
+    {
         int n = recv(data, buf, TDSH_FTP_TRANSFER_BUF_SIZE, 0);
-        if (n > 0) {
-            if (fwrite(buf, 1, (size_t)n, f) != (size_t)n) {
+        if (n > 0)
+        {
+            if (fwrite(buf, 1, (size_t)n, f) != (size_t)n)
+            {
                 ok = false;
                 break;
             }
             continue;
         }
-        if (n == 0) break; /* Normal EOF from FileZilla. */
+        if (n == 0)
+            break; /* Normal EOF from FileZilla. */
 
-        if (errno == EINTR) continue;
+        if (errno == EINTR)
+            continue;
         ok = false;
         break;
     }
 
-    if (fflush(f) != 0) ok = false;
+    if (fflush(f) != 0)
+        ok = false;
 
     free(buf);
     fclose(f);
     shutdown(data, SHUT_RDWR);
     close(data);
 
-    if (ok) replyf(c->ctrl, "226 Transfer complete.\r\n");
-    else replyf(c->ctrl, "426 Data connection error; transfer aborted.\r\n");
+    if (ok)
+        replyf(c->ctrl, "226 Transfer complete.\r\n");
+    else
+        replyf(c->ctrl, "426 Data connection error; transfer aborted.\r\n");
 }
 
 static void update_client_stack_min(void)
 {
     UBaseType_t now = uxTaskGetStackHighWaterMark(NULL);
     taskENTER_CRITICAL(&s_clients_mux);
-    if (s_client_stack_min == 0 || now < s_client_stack_min) {
+    if (s_client_stack_min == 0 || now < s_client_stack_min)
+    {
         s_client_stack_min = now;
     }
     taskEXIT_CRITICAL(&s_clients_mux);
@@ -421,9 +489,12 @@ static bool register_client_fd(int fd)
 {
     bool ok = false;
     taskENTER_CRITICAL(&s_clients_mux);
-    if (s_client_count < TDSH_FTP_MAX_CLIENTS) {
-        for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i) {
-            if (s_client_fds[i] < 0) {
+    if (s_client_count < TDSH_FTP_MAX_CLIENTS)
+    {
+        for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i)
+        {
+            if (s_client_fds[i] < 0)
+            {
                 s_client_fds[i] = fd;
                 ++s_client_count;
                 ok = true;
@@ -438,10 +509,13 @@ static bool register_client_fd(int fd)
 static void unregister_client_fd(int fd)
 {
     taskENTER_CRITICAL(&s_clients_mux);
-    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i) {
-        if (s_client_fds[i] == fd) {
+    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i)
+    {
+        if (s_client_fds[i] == fd)
+        {
             s_client_fds[i] = -1;
-            if (s_client_count > 0) --s_client_count;
+            if (s_client_count > 0)
+                --s_client_count;
             break;
         }
     }
@@ -462,13 +536,16 @@ static void shutdown_all_clients(void)
     int fds[TDSH_FTP_MAX_CLIENTS];
 
     taskENTER_CRITICAL(&s_clients_mux);
-    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i) {
+    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i)
+    {
         fds[i] = s_client_fds[i];
     }
     taskEXIT_CRITICAL(&s_clients_mux);
 
-    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i) {
-        if (fds[i] >= 0) (void)shutdown(fds[i], SHUT_RDWR);
+    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i)
+    {
+        if (fds[i] >= 0)
+            (void)shutdown(fds[i], SHUT_RDWR);
     }
 }
 
@@ -483,155 +560,248 @@ static void ftp_client_session(int fd)
     replyf(fd, "220 TinyDesk Shell %s FTP server ready.\r\n", TDSH_VERSION);
 
     char line[512];
-    while (s_running) {
+    while (s_running)
+    {
         int n = recv_line(fd, line, sizeof(line));
-        if (n == 0) break;
-        if (n < 0) continue;
+        if (n == 0)
+            break;
+        if (n < 0)
+            continue;
 
         char *arg = strchr(line, ' ');
-        if (arg) {
+        if (arg)
+        {
             *arg++ = '\0';
-            while (*arg == ' ') ++arg;
-        } else {
+            while (*arg == ' ')
+                ++arg;
+        }
+        else
+        {
             arg = (char *)"";
         }
 
-        for (char *p = line; *p; ++p) {
+        for (char *p = line; *p; ++p)
+        {
             *p = (char)toupper((unsigned char)*p);
         }
 
-        if (!strcmp(line, "USER")) {
+        if (!strcmp(line, "USER"))
+        {
             snprintf(c.username, sizeof(c.username), "%s", arg);
             c.authed = false;
             replyf(fd, "331 Password required for %s.\r\n", c.username);
-        } else if (!strcmp(line, "PASS")) {
-            if (tdsh_user_authenticate_remote(c.username, arg)) {
+        }
+        else if (!strcmp(line, "PASS"))
+        {
+            if (tdsh_user_authenticate_remote(c.username, arg))
+            {
                 c.authed = true;
-                if (!strcmp(c.username, "root")) {
+                if (!strcmp(c.username, "root"))
+                {
                     snprintf(c.cwd, sizeof(c.cwd), "/root");
-                } else {
+                }
+                else
+                {
                     snprintf(c.cwd, sizeof(c.cwd), "/home/%s", c.username);
                 }
                 replyf(fd, "230 Login successful.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "530 Login incorrect.\r\n");
             }
-        } else if (!strcmp(line, "QUIT")) {
+        }
+        else if (!strcmp(line, "QUIT"))
+        {
             replyf(fd, "221 Goodbye.\r\n");
             break;
-        } else if (!strcmp(line, "SYST")) {
+        }
+        else if (!strcmp(line, "SYST"))
+        {
             replyf(fd, "215 UNIX Type: L8\r\n");
-        } else if (!strcmp(line, "FEAT")) {
+        }
+        else if (!strcmp(line, "FEAT"))
+        {
             replyf(fd,
                    "211-Features\r\n"
                    " UTF8\r\n"
                    " SIZE\r\n"
                    " EPSV\r\n"
                    "211 End\r\n");
-        } else if (!strcmp(line, "OPTS")) {
+        }
+        else if (!strcmp(line, "OPTS"))
+        {
             replyf(fd, "200 OPTS accepted.\r\n");
-        } else if (!strcmp(line, "CLNT")) {
+        }
+        else if (!strcmp(line, "CLNT"))
+        {
             replyf(fd, "200 Client accepted.\r\n");
-        } else if (!strcmp(line, "NOOP")) {
+        }
+        else if (!strcmp(line, "NOOP"))
+        {
             replyf(fd, "200 OK.\r\n");
-        } else if (!c.authed) {
+        }
+        else if (!c.authed)
+        {
             replyf(fd, "530 Please login with USER and PASS.\r\n");
-        } else if (!strcmp(line, "PWD") || !strcmp(line, "XPWD")) {
+        }
+        else if (!strcmp(line, "PWD") || !strcmp(line, "XPWD"))
+        {
             replyf(fd, "257 \"%s\" is current directory.\r\n", c.cwd);
-        } else if (!strcmp(line, "CWD")) {
+        }
+        else if (!strcmp(line, "CWD"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             char logical[TDSH_MAX_PATH];
             struct stat st;
             if (ftp_path(&c, arg, real, sizeof(real), logical, sizeof(logical)) == 0 &&
-                stat(real, &st) == 0 && S_ISDIR(st.st_mode)) {
+                stat(real, &st) == 0 && S_ISDIR(st.st_mode))
+            {
                 snprintf(c.cwd, sizeof(c.cwd), "%s", logical);
                 replyf(fd, "250 Directory changed.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Directory unavailable.\r\n");
             }
-        } else if (!strcmp(line, "CDUP")) {
+        }
+        else if (!strcmp(line, "CDUP"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             char logical[TDSH_MAX_PATH];
-            if (ftp_path(&c, "..", real, sizeof(real), logical, sizeof(logical)) == 0) {
+            if (ftp_path(&c, "..", real, sizeof(real), logical, sizeof(logical)) == 0)
+            {
                 snprintf(c.cwd, sizeof(c.cwd), "%s", logical);
                 replyf(fd, "250 Directory changed.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Failed.\r\n");
             }
-        } else if (!strcmp(line, "TYPE")) {
+        }
+        else if (!strcmp(line, "TYPE"))
+        {
             replyf(fd, "200 Type set.\r\n");
-        } else if (!strcmp(line, "PASV")) {
-            if (open_passive(&c, false) != 0) {
+        }
+        else if (!strcmp(line, "PASV"))
+        {
+            if (open_passive(&c, false) != 0)
+            {
                 replyf(fd, "425 Cannot enter passive mode.\r\n");
             }
-        } else if (!strcmp(line, "EPSV")) {
-            if (open_passive(&c, true) != 0) {
+        }
+        else if (!strcmp(line, "EPSV"))
+        {
+            if (open_passive(&c, true) != 0)
+            {
                 replyf(fd, "425 Cannot enter passive mode.\r\n");
             }
-        } else if (!strcmp(line, "PORT") || !strcmp(line, "EPRT")) {
+        }
+        else if (!strcmp(line, "PORT") || !strcmp(line, "EPRT"))
+        {
             replyf(fd, "502 Active mode not supported; use PASV/EPSV.\r\n");
-        } else if (!strcmp(line, "LIST")) {
+        }
+        else if (!strcmp(line, "LIST"))
+        {
             do_list(&c, arg, false);
-        } else if (!strcmp(line, "NLST")) {
+        }
+        else if (!strcmp(line, "NLST"))
+        {
             do_list(&c, arg, true);
-        } else if (!strcmp(line, "RETR")) {
+        }
+        else if (!strcmp(line, "RETR"))
+        {
             do_retr(&c, arg);
-        } else if (!strcmp(line, "STOR")) {
+        }
+        else if (!strcmp(line, "STOR"))
+        {
             do_stor(&c, arg);
-        } else if (!strcmp(line, "SIZE")) {
+        }
+        else if (!strcmp(line, "SIZE"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             struct stat st;
             if (ftp_path(&c, arg, real, sizeof(real), NULL, 0) == 0 &&
-                stat(real, &st) == 0 && !S_ISDIR(st.st_mode)) {
+                stat(real, &st) == 0 && !S_ISDIR(st.st_mode))
+            {
                 replyf(fd, "213 %ld\r\n", (long)st.st_size);
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 File unavailable.\r\n");
             }
-        } else if (!strcmp(line, "DELE")) {
+        }
+        else if (!strcmp(line, "DELE"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             if (ftp_path(&c, arg, real, sizeof(real), NULL, 0) == 0 &&
-                unlink(real) == 0) {
+                unlink(real) == 0)
+            {
                 replyf(fd, "250 Deleted.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Delete failed.\r\n");
             }
-        } else if (!strcmp(line, "MKD") || !strcmp(line, "XMKD")) {
+        }
+        else if (!strcmp(line, "MKD") || !strcmp(line, "XMKD"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             char logical[TDSH_MAX_PATH];
             if (ftp_path(&c, arg, real, sizeof(real), logical, sizeof(logical)) == 0 &&
-                mkdir(real, 0755) == 0) {
+                mkdir(real, 0755) == 0)
+            {
                 replyf(fd, "257 \"%s\" created.\r\n", logical);
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Create directory failed.\r\n");
             }
-        } else if (!strcmp(line, "RMD") || !strcmp(line, "XRMD")) {
+        }
+        else if (!strcmp(line, "RMD") || !strcmp(line, "XRMD"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             if (ftp_path(&c, arg, real, sizeof(real), NULL, 0) == 0 &&
-                rmdir(real) == 0) {
+                rmdir(real) == 0)
+            {
                 replyf(fd, "250 Removed.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Remove failed.\r\n");
             }
-        } else if (!strcmp(line, "RNFR")) {
+        }
+        else if (!strcmp(line, "RNFR"))
+        {
             struct stat st;
             if (ftp_path(&c, arg, c.rename_from, sizeof(c.rename_from), NULL, 0) == 0 &&
-                stat(c.rename_from, &st) == 0) {
+                stat(c.rename_from, &st) == 0)
+            {
                 replyf(fd, "350 Ready for RNTO.\r\n");
-            } else {
+            }
+            else
+            {
                 c.rename_from[0] = '\0';
                 replyf(fd, "550 Source unavailable.\r\n");
             }
-        } else if (!strcmp(line, "RNTO")) {
+        }
+        else if (!strcmp(line, "RNTO"))
+        {
             char real[TDSH_MAX_PATH + sizeof(TDSH_MOUNT_POINT) + 32];
             if (c.rename_from[0] &&
                 ftp_path(&c, arg, real, sizeof(real), NULL, 0) == 0 &&
-                rename(c.rename_from, real) == 0) {
+                rename(c.rename_from, real) == 0)
+            {
                 replyf(fd, "250 Rename successful.\r\n");
-            } else {
+            }
+            else
+            {
                 replyf(fd, "550 Rename failed.\r\n");
             }
             c.rename_from[0] = '\0';
-        } else {
+        }
+        else
+        {
             replyf(fd, "502 Command not implemented.\r\n");
         }
 
@@ -664,7 +834,8 @@ static void ftp_listener_task(void *arg)
     (void)arg;
 
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (fd < 0) goto done;
+    if (fd < 0)
+        goto done;
 
     int yes = 1;
     (void)setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -676,7 +847,8 @@ static void ftp_listener_task(void *arg)
     addr.sin_port = htons(s_port);
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 ||
-        listen(fd, (int)TDSH_FTP_MAX_CLIENTS) != 0) {
+        listen(fd, (int)TDSH_FTP_MAX_CLIENTS) != 0)
+    {
         ESP_LOGE(TAG, "FTP bind/listen on port %u failed: errno=%d", s_port, errno);
         close(fd);
         goto done;
@@ -686,29 +858,37 @@ static void ftp_listener_task(void *arg)
     ESP_LOGI(TAG, "FTP server listening on port %u (max clients=%u)",
              s_port, (unsigned)TDSH_FTP_MAX_CLIENTS);
 
-    while (s_running) {
+    while (s_running)
+    {
         struct sockaddr_in peer = {0};
         socklen_t plen = sizeof(peer);
         int c = accept(fd, (struct sockaddr *)&peer, &plen);
-        if (c < 0) {
-            if (errno == EINTR) continue;
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (c < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
                 UBaseType_t now = uxTaskGetStackHighWaterMark(NULL);
-                if (s_listener_stack_min == 0 || now < s_listener_stack_min) {
+                if (s_listener_stack_min == 0 || now < s_listener_stack_min)
+                {
                     s_listener_stack_min = now;
                 }
                 continue;
             }
-            if (!s_running) break;
+            if (!s_running)
+                break;
             continue;
         }
 
-        if (!s_running) {
+        if (!s_running)
+        {
             close(c);
             break;
         }
 
-        if (!register_client_fd(c)) {
+        if (!register_client_fd(c))
+        {
             replyf(c, "421 Too many FTP connections. Try again later.\r\n");
             shutdown(c, SHUT_RDWR);
             close(c);
@@ -719,7 +899,8 @@ static void ftp_listener_task(void *arg)
                  inet_ntoa(peer.sin_addr), get_client_count());
 
         ftp_client_task_arg_t *ctx = malloc(sizeof(*ctx));
-        if (!ctx) {
+        if (!ctx)
+        {
             replyf(c, "421 Server out of memory.\r\n");
             unregister_client_fd(c);
             shutdown(c, SHUT_RDWR);
@@ -733,7 +914,8 @@ static void ftp_listener_task(void *arg)
                         TDSH_FTP_CLIENT_STACK_SIZE,
                         ctx,
                         4,
-                        NULL) != pdPASS) {
+                        NULL) != pdPASS)
+        {
             free(ctx);
             replyf(c, "421 Unable to create FTP session.\r\n");
             unregister_client_fd(c);
@@ -756,7 +938,8 @@ done:
 static void reset_client_slots(void)
 {
     taskENTER_CRITICAL(&s_clients_mux);
-    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i) {
+    for (unsigned i = 0; i < TDSH_FTP_MAX_CLIENTS; ++i)
+    {
         s_client_fds[i] = -1;
     }
     s_client_count = 0;
@@ -767,17 +950,19 @@ static void reset_client_slots(void)
 
 static int ftp_start(uint16_t port)
 {
-    if (!tdsh_remote_access_ready()) {
-        printf("ftp: change the factory root password with passwd first (old password: "
-               TDSH_FACTORY_ROOT_PASSWORD ")\n");
+    if (!tdsh_remote_access_ready())
+    {
+        printf("ftp: change the factory root password with passwd first (old password: " TDSH_FACTORY_ROOT_PASSWORD ")\n");
         return 1;
     }
-    if (s_running) {
+    if (s_running)
+    {
         printf("FTP server is already running on port %u.\n", s_port);
         return 0;
     }
 
-    if (!tdsh_network_is_online()) {
+    if (!tdsh_network_is_online())
+    {
         printf("ftp: no network interface is connected.\n");
         return 1;
     }
@@ -791,7 +976,8 @@ static int ftp_start(uint16_t port)
                     TDSH_FTP_LISTENER_STACK_SIZE,
                     NULL,
                     4,
-                    &s_listener_task) != pdPASS) {
+                    &s_listener_task) != pdPASS)
+    {
         s_running = false;
         s_listener_task = NULL;
         printf("ftp: failed to create server task\n");
@@ -807,14 +993,16 @@ static int ftp_start(uint16_t port)
 
 static void ftp_stop(void)
 {
-    if (!s_running) {
+    if (!s_running)
+    {
         printf("FTP server is not running.\n");
         return;
     }
 
     s_running = false;
 
-    if (s_listen_fd >= 0) {
+    if (s_listen_fd >= 0)
+    {
         (void)shutdown(s_listen_fd, SHUT_RDWR);
     }
     shutdown_all_clients();
@@ -825,28 +1013,33 @@ static void ftp_stop(void)
 /* status and control for GUI front ends. */
 bool tdsh_ftp_is_running(uint16_t *port)
 {
-    if (port) *port = s_port;
+    if (port)
+        *port = s_port;
     return s_running;
 }
 
 int tdsh_ftp_set_running(bool on)
 {
-    if (on == s_running) return 0;
-    if (on) return ftp_start(s_port ? s_port : TDSH_DEFAULT_FTP_PORT);
+    if (on == s_running)
+        return 0;
+    if (on)
+        return ftp_start(s_port ? s_port : TDSH_DEFAULT_FTP_PORT);
     ftp_stop();
     return 0;
 }
 
 int tdsh_cmd_ftp(tdsh_session_t *session, int argc, char **argv)
 {
-
-    if (argc < 2) {
+    if (argc < 2)
+    {
         printf("usage: ftp <start|stop|restart|status> [port]\n");
         return 2;
     }
 
-    if (!strcmp(argv[1], "status")) {
-        if (s_running) {
+    if (!strcmp(argv[1], "status"))
+    {
+        if (s_running)
+        {
             printf("FTP server: running on port %u\n", s_port);
             printf("FTP active clients: %u / %u\n",
                    get_client_count(), (unsigned)TDSH_FTP_MAX_CLIENTS);
@@ -854,48 +1047,60 @@ int tdsh_cmd_ftp(tdsh_session_t *session, int argc, char **argv)
                    (unsigned)TDSH_FTP_LISTENER_STACK_SIZE);
             printf("FTP client stack: %u bytes each\n",
                    (unsigned)TDSH_FTP_CLIENT_STACK_SIZE);
-            if (s_listener_stack_min) {
+            if (s_listener_stack_min)
+            {
                 printf("FTP minimum free listener stack observed: %u bytes\n",
                        (unsigned)s_listener_stack_min);
             }
-            if (s_client_stack_min) {
+            if (s_client_stack_min)
+            {
                 printf("FTP minimum free client stack observed: %u bytes\n",
                        (unsigned)s_client_stack_min);
             }
-        } else {
+        }
+        else
+        {
             printf("FTP server: stopped\n");
         }
         return 0;
     }
 
-    if (strcmp(session->username, "root") != 0 && !tdsh_is_physical_console()) {
+    if (strcmp(session->username, "root") != 0 && !tdsh_is_physical_console())
+    {
         printf("ftp: permission denied: root, or any user on the local console/desktop\n");
         return 1;
     }
 
     uint16_t port = TDSH_DEFAULT_FTP_PORT;
-    if (argc >= 3) {
+    if (argc >= 3)
+    {
         char *end = NULL;
         long p = strtol(argv[2], &end, 10);
-        if (!end || *end || p < 1 || p > 65535) {
+        if (!end || *end || p < 1 || p > 65535)
+        {
             printf("ftp: invalid port\n");
             return 2;
         }
         port = (uint16_t)p;
     }
 
-    if (!strcmp(argv[1], "start")) return ftp_start(port);
+    if (!strcmp(argv[1], "start"))
+        return ftp_start(port);
 
-    if (!strcmp(argv[1], "stop")) {
+    if (!strcmp(argv[1], "stop"))
+    {
         ftp_stop();
         return 0;
     }
 
-    if (!strcmp(argv[1], "restart")) {
+    if (!strcmp(argv[1], "restart"))
+    {
         ftp_stop();
 
-        for (int i = 0; i < 60; ++i) {
-            if (!s_listener_task && get_client_count() == 0) break;
+        for (int i = 0; i < 60; ++i)
+        {
+            if (!s_listener_task && get_client_count() == 0)
+                break;
             vTaskDelay(pdMS_TO_TICKS(50));
         }
 

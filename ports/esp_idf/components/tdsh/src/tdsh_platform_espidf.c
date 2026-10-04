@@ -14,7 +14,8 @@
 
 static const char *TAG = "tdsh-port";
 
-typedef struct {
+typedef struct
+{
     tdsh_worker_fn_t worker;
     tdsh_worker_cleanup_fn_t cleanup;
     void *arg;
@@ -36,9 +37,14 @@ static uint64_t idf_monotonic_ms(void *ctx)
 static void idf_sleep_ms(void *ctx, uint32_t ms)
 {
     (void)ctx;
-    if (ms == 0) { taskYIELD(); return; }
+    if (ms == 0)
+    {
+        taskYIELD();
+        return;
+    }
     TickType_t ticks = pdMS_TO_TICKS(ms);
-    if (ticks == 0) ticks = 1;
+    if (ticks == 0)
+        ticks = 1;
     vTaskDelay(ticks);
 }
 
@@ -51,7 +57,8 @@ static void idf_yield(void *ctx)
 static int idf_random_bytes(void *ctx, void *buffer, size_t length)
 {
     (void)ctx;
-    if (!buffer && length) return -EINVAL;
+    if (!buffer && length)
+        return -EINVAL;
     esp_fill_random(buffer, length);
     return 0;
 }
@@ -87,7 +94,8 @@ static void worker_task(void *opaque)
     stdout = ctx->std_out;
     stderr = ctx->std_err;
     ctx->result = ctx->worker(ctx->arg);
-    if (ctx->cleanup) ctx->cleanup(ctx->arg);
+    if (ctx->cleanup)
+        ctx->cleanup(ctx->arg);
     /* Newlib closes a deleted task's stdio when it differs from the global
      * streams; hand the borrowed streams back first. */
     stdin = _REENT_STDIN(_GLOBAL_REENT);
@@ -95,15 +103,19 @@ static void worker_task(void *opaque)
     stderr = _REENT_STDERR(_GLOBAL_REENT);
 
     UBaseType_t free_stack = uxTaskGetStackHighWaterMark(NULL);
-    if (free_stack < 4096U) {
+    if (free_stack < 4096U)
+    {
         ESP_LOGW(TAG, "%s low stack: minimum free=%u bytes",
                  ctx->name, (unsigned)free_stack);
-    } else {
+    }
+    else
+    {
         ESP_LOGD(TAG, "%s minimum free stack=%u bytes",
                  ctx->name, (unsigned)free_stack);
     }
 
-    if (ctx->background) {
+    if (ctx->background)
+    {
         ESP_LOGI(TAG, "%s finished status=%d", ctx->name, ctx->result);
         heap_caps_free(ctx);
         vTaskDelete(NULL);
@@ -125,10 +137,12 @@ static int idf_worker_run(void *context,
                           int *result_out)
 {
     (void)context;
-    if (!worker || stack_bytes == 0) return -EINVAL;
+    if (!worker || stack_bytes == 0)
+        return -EINVAL;
 
     worker_ctx_t *ctx = heap_caps_calloc(1, sizeof(*ctx), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    if (!ctx) return -ENOMEM;
+    if (!ctx)
+        return -ENOMEM;
     ctx->worker = worker;
     ctx->cleanup = cleanup;
     ctx->arg = arg;
@@ -142,9 +156,11 @@ static int idf_worker_run(void *context,
     ctx->std_err = inherit ? stderr : _REENT_STDERR(_GLOBAL_REENT);
     snprintf(ctx->name, sizeof(ctx->name), "%s", name ? name : "tdsh_worker");
 
-    if (!background) {
+    if (!background)
+    {
         ctx->done = xSemaphoreCreateBinary();
-        if (!ctx->done) {
+        if (!ctx->done)
+        {
             heap_caps_free(ctx);
             return -ENOMEM;
         }
@@ -156,17 +172,21 @@ static int idf_worker_run(void *context,
                                 ctx,
                                 (UBaseType_t)priority,
                                 NULL);
-    if (ok != pdPASS) {
-        if (ctx->done) vSemaphoreDelete(ctx->done);
+    if (ok != pdPASS)
+    {
+        if (ctx->done)
+            vSemaphoreDelete(ctx->done);
         heap_caps_free(ctx);
         return -ENOMEM;
     }
 
     /* Ownership of arg transferred after successful xTaskCreate. */
-    if (background) return 0;
+    if (background)
+        return 0;
 
     xSemaphoreTake(ctx->done, portMAX_DELAY);
-    if (result_out) *result_out = ctx->result;
+    if (result_out)
+        *result_out = ctx->result;
     vSemaphoreDelete(ctx->done);
     heap_caps_free(ctx);
     return 0;

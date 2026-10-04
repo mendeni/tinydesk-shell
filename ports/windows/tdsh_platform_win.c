@@ -33,10 +33,13 @@ static int win_random_bytes(void *ctx, void *buffer, size_t length)
 {
     (void)ctx;
     uint8_t *p = buffer;
-    while (length > 0) {
+    while (length > 0)
+    {
         unsigned int v;
-        if (rand_s(&v) != 0) return -EIO;
-        for (int i = 0; i < 4 && length > 0; i++, length--) {
+        if (rand_s(&v) != 0)
+            return -EIO;
+        for (int i = 0; i < 4 && length > 0; i++, length--)
+        {
             *p++ = (uint8_t)v;
             v >>= 8;
         }
@@ -44,7 +47,8 @@ static int win_random_bytes(void *ctx, void *buffer, size_t length)
     return 0;
 }
 
-typedef struct {
+typedef struct
+{
     tdsh_worker_fn_t worker;
     tdsh_worker_cleanup_fn_t cleanup;
     void *arg;
@@ -58,8 +62,10 @@ static DWORD WINAPI worker_entry(LPVOID param)
     worker_t *w = param;
     ushw_set_std(w->std);
     w->result = w->worker(w->arg);
-    if (w->cleanup) w->cleanup(w->arg);
-    if (w->background) free(w);
+    if (w->cleanup)
+        w->cleanup(w->arg);
+    if (w->background)
+        free(w);
     return 0;
 }
 
@@ -70,9 +76,11 @@ static int win_worker_run(void *ctx, const char *name, size_t stack_bytes, int p
     (void)ctx;
     (void)name;
     (void)priority;
-    if (!worker) return -EINVAL;
+    if (!worker)
+        return -EINVAL;
     worker_t *w = calloc(1, sizeof(*w));
-    if (!w) return -ENOMEM;
+    if (!w)
+        return -ENOMEM;
     w->worker = worker;
     w->cleanup = cleanup;
     w->arg = arg;
@@ -80,17 +88,20 @@ static int win_worker_run(void *ctx, const char *name, size_t stack_bytes, int p
     ushw_get_std(w->std);
 
     HANDLE h = CreateThread(NULL, stack_bytes, worker_entry, w, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
-    if (!h) {
+    if (!h)
+    {
         free(w);
         return -ENOMEM;
     }
-    if (background) {
+    if (background)
+    {
         CloseHandle(h);
         return 0;
     }
     WaitForSingleObject(h, INFINITE);
     CloseHandle(h);
-    if (result_out) *result_out = w->result;
+    if (result_out)
+        *result_out = w->result;
     free(w);
     return 0;
 }
@@ -106,7 +117,8 @@ static const tdsh_platform_api_t s_platform = {
 
 static int make_dir(const char *path)
 {
-    if (_mkdir(path) == 0 || errno == EEXIST) return 0;
+    if (_mkdir(path) == 0 || errno == EEXIST)
+        return 0;
     return -errno;
 }
 
@@ -117,18 +129,23 @@ int tdsh_win_init(const char *fs_root, const char *hostname)
 
 int tdsh_win_init_user(const char *fs_root, const char *hostname, const char *user)
 {
-    static const char *const dirs[] = { "", "/root", "/home", "/tmp", "/etc" };
+    static const char *const dirs[] = {"", "/root", "/home", "/tmp", "/etc"};
     char path[TDSH_MAX_REAL_PATH];
-    for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+    for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++)
+    {
         snprintf(path, sizeof(path), "%s%s", fs_root, dirs[i]);
         int rc = make_dir(path);
-        if (rc) return rc;
+        if (rc)
+            return rc;
     }
-    if (!user || !user[0]) user = "root";
-    if (strcmp(user, "root") != 0) {             /* the user's home, /home/<user> */
+    if (!user || !user[0])
+        user = "root";
+    if (strcmp(user, "root") != 0)
+    {             /* the user's home, /home/<user> */
         snprintf(path, sizeof(path), "%s/home/%s", fs_root, user);
         int rc = make_dir(path);
-        if (rc) return rc;
+        if (rc)
+            return rc;
     }
 
     tdsh_core_config_t core = TDSH_CORE_CONFIG_DEFAULT();
@@ -137,8 +154,10 @@ int tdsh_win_init_user(const char *fs_root, const char *hostname, const char *us
     core.fs_root = fs_root;
     core.platform = &s_platform;
     int rc = tdsh_core_init(&core);
-    if (rc) return rc;
+    if (rc)
+        return rc;
     rc = tdsh_register_core_builtins();
-    if (rc) return rc;
+    if (rc)
+        return rc;
     return tdsh_win_register_commands();   /* ifconfig, ping, date, tz, ... */
 }

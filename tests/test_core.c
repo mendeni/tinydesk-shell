@@ -8,11 +8,20 @@
 #include <unistd.h>
 
 static int failures;
-#define CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); failures++; } } while (0)
+#define CHECK(cond, msg)                        \
+    do                                          \
+    {                                           \
+        if (!(cond))                            \
+        {                                       \
+            fprintf(stderr, "FAIL: %s\n", msg); \
+            failures++;                         \
+        }                                       \
+    } while (0)
 
 static int cmd_probe(tdsh_session_t *session, int argc, char **argv)
 {
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
     return tdsh_var_set(session, "PROBE", "ok") == 0 ? 0 : 1;
 }
 
@@ -21,7 +30,8 @@ int main(void)
     char root_template[] = "/tmp/tdsh-sdk-test-XXXXXX";
     char *root = mkdtemp(root_template);
     CHECK(root != NULL, "mkdtemp");
-    if (!root) return 1;
+    if (!root)
+        return 1;
 
     tdsh_posix_config_t cfg = TDSH_POSIX_CONFIG_DEFAULT();
     cfg.hostname = "testhost";
@@ -42,8 +52,7 @@ int main(void)
     CHECK(tdsh_path_normalize(&s, "/root", logical, sizeof(logical)) == -EACCES, "root denied");
 
     static const tdsh_command_t probe = {
-        "probe", "probe", "test command", cmd_probe, 0
-    };
+        "probe", "probe", "test command", cmd_probe, 0};
     CHECK(tdsh_register_command(&probe) == 0, "custom command register");
     CHECK(tdsh_execute_line(&s, "probe") == 0, "custom command execute");
     CHECK(strcmp(tdsh_var_get(&s, "PROBE"), "ok") == 0, "command changed session");
@@ -57,7 +66,8 @@ int main(void)
     CHECK(tdsh_path_to_real(&s, "~/scope.tdsh", real, sizeof(real), NULL, 0) == 0, "script real path");
     FILE *f = fopen(real, "w");
     CHECK(f != NULL, "create script");
-    if (f) {
+    if (f)
+    {
         fputs("TEMP=inside\n", f);
         fputs("I=0\n", f);
         fputs("while $I < 3\n", f);
@@ -73,7 +83,8 @@ int main(void)
     tdsh_memory_get_stats(&st);
     CHECK(st.live_blocks == 0, "no live tracked core allocations after test");
 
-    if (failures) {
+    if (failures)
+    {
         fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
     }

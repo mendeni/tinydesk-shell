@@ -7,14 +7,16 @@
 #include "tdsh.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef struct {
-    void *context;
-    int (*read_byte)(void *context, uint8_t *byte_out);
-    int (*write_bytes)(void *context, const void *data, size_t length);
-} tdsh_terminal_io_t;
+    typedef struct
+    {
+        void *context;
+        int (*read_byte)(void *context, uint8_t *byte_out);
+        int (*write_bytes)(void *context, const void *data, size_t length);
+    } tdsh_terminal_io_t;
 
 /* Portable VT100/ANSI line editor used by terminal transports.
  *
@@ -33,11 +35,11 @@ typedef struct {
  * History is stored at ~/.tdsh_history through the normal TinyDesk Shell virtual
  * filesystem resolver, so it remains inside the configured sandbox.
  */
-int tdsh_terminal_readline(tdsh_session_t *session,
-                             const tdsh_terminal_io_t *io,
-                             const char *prompt,
-                             char *buffer,
-                             size_t capacity);
+    int tdsh_terminal_readline(tdsh_session_t *session,
+                               const tdsh_terminal_io_t *io,
+                               const char *prompt,
+                               char *buffer,
+                               size_t capacity);
 
 #ifdef __cplusplus
 }

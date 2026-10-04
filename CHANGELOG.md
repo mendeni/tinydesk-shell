@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+* **Code style:** the C sources are formatted with `clang-format`
+  (`.clang-format` in the repository root): braces on their own lines, one
+  statement per line. Layout only; the code is unchanged.
+
 ## 0.1.3 (2026-10-01)
 
 * **nano follows the terminal's size** (asked with ESC[6n when it starts;

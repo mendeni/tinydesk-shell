@@ -42,7 +42,8 @@
 #include "tdsh_board.h"
 
 /* Wiring, read from the board configuration when the command starts. */
-typedef struct {
+typedef struct
+{
     int spi_host, miso, mosi, sclk, sd_cs;   /* SD card on the SPI bus (shared with a W6100) */
     int r1_uart, r1_tx, r1_rx, r1_de;        /* RS-485 line 1: UART RS-485 mode, DE on RTS */
     int r2_uart, r2_tx, r2_rx, r2_de;        /* RS-485 line 2: DE driven by hand */
@@ -67,41 +68,44 @@ static void hwtest_load_pins(void)
     s_pin.r2_de = tdsh_board_int("rs485.2.de", -1);
 }
 
-static bool sd_configured(void) { return s_pin.miso >= 0 && s_pin.mosi >= 0 && s_pin.sclk >= 0 && s_pin.sd_cs >= 0; }
+static bool sd_configured(void)
+{
+    return s_pin.miso >= 0 && s_pin.mosi >= 0 && s_pin.sclk >= 0 && s_pin.sd_cs >= 0;
+}
 static bool rs485_configured(void)
 {
     return s_pin.r1_uart >= 0 && s_pin.r1_tx >= 0 && s_pin.r1_rx >= 0 && s_pin.r1_de >= 0 &&
            s_pin.r2_uart >= 0 && s_pin.r2_tx >= 0 && s_pin.r2_rx >= 0 && s_pin.r2_de >= 0;
 }
 
-#define HWTEST_SPI_HOST              ((spi_host_device_t)s_pin.spi_host)
-#define HWTEST_SPI_MISO_GPIO         ((gpio_num_t)s_pin.miso)
-#define HWTEST_SPI_MOSI_GPIO         ((gpio_num_t)s_pin.mosi)
-#define HWTEST_SPI_SCLK_GPIO         ((gpio_num_t)s_pin.sclk)
-#define HWTEST_SD_CS_GPIO            ((gpio_num_t)s_pin.sd_cs)
-#define HWTEST_SD_MAX_FREQ_KHZ       10000
-#define HWTEST_SD_MOUNT_POINT        "/sd"
-#define HWTEST_SD_FILE               "/sd/HWTEST.BIN"
-#define HWTEST_SD_TEST_BYTES         4096U
-#define HWTEST_UART_BAUD             115200
+#define HWTEST_SPI_HOST        ((spi_host_device_t)s_pin.spi_host)
+#define HWTEST_SPI_MISO_GPIO   ((gpio_num_t)s_pin.miso)
+#define HWTEST_SPI_MOSI_GPIO   ((gpio_num_t)s_pin.mosi)
+#define HWTEST_SPI_SCLK_GPIO   ((gpio_num_t)s_pin.sclk)
+#define HWTEST_SD_CS_GPIO      ((gpio_num_t)s_pin.sd_cs)
+#define HWTEST_SD_MAX_FREQ_KHZ 10000
+#define HWTEST_SD_MOUNT_POINT  "/sd"
+#define HWTEST_SD_FILE         "/sd/HWTEST.BIN"
+#define HWTEST_SD_TEST_BYTES   4096U
+#define HWTEST_UART_BAUD       115200
 
 /* ESP32-C6 LP UART: its pins are fixed (TX GPIO5, RX GPIO4). */
-#define HWTEST_UART_TX_GPIO          GPIO_NUM_5
-#define HWTEST_UART_RX_GPIO          GPIO_NUM_4
+#define HWTEST_UART_TX_GPIO GPIO_NUM_5
+#define HWTEST_UART_RX_GPIO GPIO_NUM_4
 
-#define HWTEST_RS485_1_UART          ((uart_port_t)s_pin.r1_uart)
-#define HWTEST_RS485_1_TX_GPIO       ((gpio_num_t)s_pin.r1_tx)
-#define HWTEST_RS485_1_RX_GPIO       ((gpio_num_t)s_pin.r1_rx)
-#define HWTEST_RS485_1_DIR_GPIO      ((gpio_num_t)s_pin.r1_de)
-#define HWTEST_RS485_2_UART          ((uart_port_t)s_pin.r2_uart)
-#define HWTEST_RS485_2_TX_GPIO       ((gpio_num_t)s_pin.r2_tx)
-#define HWTEST_RS485_2_RX_GPIO       ((gpio_num_t)s_pin.r2_rx)
-#define HWTEST_RS485_2_DIR_GPIO      ((gpio_num_t)s_pin.r2_de)
+#define HWTEST_RS485_1_UART     ((uart_port_t)s_pin.r1_uart)
+#define HWTEST_RS485_1_TX_GPIO  ((gpio_num_t)s_pin.r1_tx)
+#define HWTEST_RS485_1_RX_GPIO  ((gpio_num_t)s_pin.r1_rx)
+#define HWTEST_RS485_1_DIR_GPIO ((gpio_num_t)s_pin.r1_de)
+#define HWTEST_RS485_2_UART     ((uart_port_t)s_pin.r2_uart)
+#define HWTEST_RS485_2_TX_GPIO  ((gpio_num_t)s_pin.r2_tx)
+#define HWTEST_RS485_2_RX_GPIO  ((gpio_num_t)s_pin.r2_rx)
+#define HWTEST_RS485_2_DIR_GPIO ((gpio_num_t)s_pin.r2_de)
 
-#define HWTEST_RS485_BAUD            9600
-#define HWTEST_UART_RX_BUFFER        256
-#define HWTEST_READ_TIMEOUT_MS       700
-#define HWTEST_TX_TIMEOUT_MS         500
+#define HWTEST_RS485_BAUD      9600
+#define HWTEST_UART_RX_BUFFER  256
+#define HWTEST_READ_TIMEOUT_MS 700
+#define HWTEST_TX_TIMEOUT_MS   500
 
 /*
  * LP-UART reconfiguration can create a short receive-side transient while
@@ -109,33 +113,30 @@ static bool rs485_configured(void)
  * drain anything that arrived during reconfiguration, then start the real
  * loopback transaction.
  */
-#define HWTEST_UART_SETTLE_MS        30
-#define HWTEST_UART_DRAIN_GAP_MS     5
-#define HWTEST_UART_MAX_ATTEMPTS     2
+#define HWTEST_UART_SETTLE_MS    30
+#define HWTEST_UART_DRAIN_GAP_MS 5
+#define HWTEST_UART_MAX_ATTEMPTS 2
 
 /* Optional command repeat/stress count. */
-#define HWTEST_REPEAT_MAX            100000U
-#define HWTEST_PROGRESS_STEPS        10U
+#define HWTEST_REPEAT_MAX     100000U
+#define HWTEST_PROGRESS_STEPS 10U
 
 #if CONFIG_IDF_TARGET_ESP32C6   /* the LP UART loopback test */
 static const uint8_t s_uart_pattern[] = {
     0x55, 0xAA, 0x00, 0xFF, 0x11, 0x22, 0x33, 0x44,
     'u', 'S', 'h', 'e', 'l', 'l', '-', 'U',
-    'A', 'R', 'T', '-', 'L', 'O', 'O', 'P'
-};
+    'A', 'R', 'T', '-', 'L', 'O', 'O', 'P'};
 #endif
 
 static const uint8_t s_rs485_1_to_2[] = {
     0xA5, 0x5A, 0x01, 0x10, 0x20, 0x30, 0x40, 0x50,
     'R', 'S', '4', '8', '5', '-', '1', '>',
-    '2', '-', 'u', 'S', 'h', 'e', 'l', 'l'
-};
+    '2', '-', 'u', 'S', 'h', 'e', 'l', 'l'};
 
 static const uint8_t s_rs485_2_to_1[] = {
     0x5A, 0xA5, 0x02, 0x60, 0x70, 0x80, 0x90, 0xF0,
     'R', 'S', '4', '8', '5', '-', '2', '>',
-    '1', '-', 'u', 'S', 'h', 'e', 'l', 'l'
-};
+    '1', '-', 'u', 'S', 'h', 'e', 'l', 'l'};
 
 /*
  * Detailed per-cycle output is suppressed during repeat/stress tests so
@@ -143,11 +144,13 @@ static const uint8_t s_rs485_2_to_1[] = {
  */
 static bool s_hwtest_quiet = false;
 
-#define HWTEST_DETAIL(...)                                  \
-    do {                                                    \
-        if (!s_hwtest_quiet) {                              \
-            printf(__VA_ARGS__);                            \
-        }                                                   \
+#define HWTEST_DETAIL(...)       \
+    do                           \
+    {                            \
+        if (!s_hwtest_quiet)     \
+        {                        \
+            printf(__VA_ARGS__); \
+        }                        \
     } while (0)
 
 static void print_result(const char *name, bool pass)
@@ -160,7 +163,8 @@ static int uart_read_expected(uart_port_t port,
                               size_t expected,
                               uint32_t timeout_ms)
 {
-    if (buffer == NULL || expected == 0U) {
+    if (buffer == NULL || expected == 0U)
+    {
         return -1;
     }
 
@@ -168,15 +172,18 @@ static int uart_read_expected(uart_port_t port,
     const int64_t deadline =
         esp_timer_get_time() + ((int64_t)timeout_ms * 1000LL);
 
-    while (total < expected && esp_timer_get_time() < deadline) {
+    while (total < expected && esp_timer_get_time() < deadline)
+    {
         int got = uart_read_bytes(port,
                                   buffer + total,
                                   expected - total,
                                   pdMS_TO_TICKS(20));
-        if (got < 0) {
+        if (got < 0)
+        {
             return -1;
         }
-        if (got > 0) {
+        if (got > 0)
+        {
             total += (size_t)got;
         }
     }
@@ -190,21 +197,24 @@ static void print_mismatch(const uint8_t *expected,
                            size_t actual_len)
 {
     HWTEST_DETAIL("  expected %u byte(s), received %u byte(s)\n",
-           (unsigned)expected_len,
-           (unsigned)actual_len);
+                  (unsigned)expected_len,
+                  (unsigned)actual_len);
 
     size_t compare = actual_len < expected_len ? actual_len : expected_len;
-    for (size_t i = 0U; i < compare; ++i) {
-        if (expected[i] != actual[i]) {
+    for (size_t i = 0U; i < compare; ++i)
+    {
+        if (expected[i] != actual[i])
+        {
             HWTEST_DETAIL("  first mismatch at byte %u: expected=0x%02X actual=0x%02X\n",
-                   (unsigned)i,
-                   (unsigned)expected[i],
-                   (unsigned)actual[i]);
+                          (unsigned)i,
+                          (unsigned)expected[i],
+                          (unsigned)actual[i]);
             return;
         }
     }
 
-    if (actual_len != expected_len) {
+    if (actual_len != expected_len)
+    {
         HWTEST_DETAIL("  payload prefix matched, but byte count differed\n");
     }
 }
@@ -227,7 +237,8 @@ static esp_err_t ensure_shared_spi_bus(void)
      */
     static bool s_spi_bus_ready = false;
 
-    if (s_spi_bus_ready) {
+    if (s_spi_bus_ready)
+    {
         return ESP_OK;
     }
 
@@ -243,13 +254,15 @@ static esp_err_t ensure_shared_spi_bus(void)
     esp_err_t err =
         spi_bus_initialize(HWTEST_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
 
-    if (err == ESP_OK) {
+    if (err == ESP_OK)
+    {
         HWTEST_DETAIL("  SPI2 bus initialized by hwtest\n");
         s_spi_bus_ready = true;
         return ESP_OK;
     }
 
-    if (err == ESP_ERR_INVALID_STATE) {
+    if (err == ESP_ERR_INVALID_STATE)
+    {
         /*
          * Expected when W6100 has already initialized the same SPI2 bus.
          * The SD device is simply attached with its own CS pin.
@@ -264,29 +277,32 @@ static esp_err_t ensure_shared_spi_bus(void)
 
 static esp_err_t hwtest_sd(void)
 {
-    if (!sd_configured()) {
+    if (!sd_configured())
+    {
         HWTEST_DETAIL("  SD card pins are not configured (board keys sd.cs and eth.* or sd.miso/mosi/sclk)\n");
         return ESP_ERR_NOT_SUPPORTED;
     }
     HWTEST_DETAIL("\n[SD CARD]\n");
     HWTEST_DETAIL("  SPI2 MISO=%d MOSI=%d SCLK=%d CS=%d @ <=%d kHz\n",
-           HWTEST_SPI_MISO_GPIO,
-           HWTEST_SPI_MOSI_GPIO,
-           HWTEST_SPI_SCLK_GPIO,
-           HWTEST_SD_CS_GPIO,
-           HWTEST_SD_MAX_FREQ_KHZ);
+                  HWTEST_SPI_MISO_GPIO,
+                  HWTEST_SPI_MOSI_GPIO,
+                  HWTEST_SPI_SCLK_GPIO,
+                  HWTEST_SD_CS_GPIO,
+                  HWTEST_SD_MAX_FREQ_KHZ);
 
     /* Mounted with `sd mount` (or at boot): test on it, leave it mounted. */
     const bool premounted = tdsh_sdcard_mounted();
     sdmmc_card_t *card = premounted ? (sdmmc_card_t *)tdsh_sdcard_card() : NULL;
     esp_err_t err = ESP_OK;
-    if (premounted) {
+    if (premounted)
+    {
         HWTEST_DETAIL("  Card already mounted at %s (sd mount); testing on it\n", HWTEST_SD_MOUNT_POINT);
         goto mounted;
     }
 
     err = ensure_shared_spi_bus();
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  SPI bus initialization failed: %s\n", esp_err_to_name(err));
         return err;
     }
@@ -310,7 +326,8 @@ static esp_err_t hwtest_sd(void)
                                   &slot_cfg,
                                   &mount_cfg,
                                   &card);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  SD mount failed: %s\n", esp_err_to_name(err));
         HWTEST_DETAIL("  Card is NOT formatted automatically by this test.\n");
         HWTEST_DETAIL("  Use a FAT-formatted card and verify SPI pull-ups/wiring.\n");
@@ -319,7 +336,8 @@ static esp_err_t hwtest_sd(void)
 
     HWTEST_DETAIL("  Card mounted at %s\n", HWTEST_SD_MOUNT_POINT);
 mounted:
-    if (!s_hwtest_quiet) {
+    if (!s_hwtest_quiet)
+    {
         sdmmc_card_print_info(stdout, card);
     }
 
@@ -327,7 +345,8 @@ mounted:
     (void)unlink(HWTEST_SD_FILE);
 
     FILE *fp = fopen(HWTEST_SD_FILE, "wb");
-    if (fp == NULL) {
+    if (fp == NULL)
+    {
         err = ESP_FAIL;
         HWTEST_DETAIL("  fopen(write) failed: errno=%d (%s)\n", errno, strerror(errno));
         goto cleanup;
@@ -336,17 +355,21 @@ mounted:
     uint8_t block[512];
     for (size_t offset = 0U;
          offset < HWTEST_SD_TEST_BYTES;
-         offset += sizeof(block)) {
+         offset += sizeof(block))
+    {
         size_t n = HWTEST_SD_TEST_BYTES - offset;
-        if (n > sizeof(block)) {
+        if (n > sizeof(block))
+        {
             n = sizeof(block);
         }
 
-        for (size_t i = 0U; i < n; ++i) {
+        for (size_t i = 0U; i < n; ++i)
+        {
             block[i] = sd_pattern_byte(offset + i);
         }
 
-        if (fwrite(block, 1U, n, fp) != n) {
+        if (fwrite(block, 1U, n, fp) != n)
+        {
             HWTEST_DETAIL("  SD write failed at offset %u\n", (unsigned)offset);
             fclose(fp);
             fp = NULL;
@@ -355,7 +378,8 @@ mounted:
         }
     }
 
-    if (fflush(fp) != 0) {
+    if (fflush(fp) != 0)
+    {
         HWTEST_DETAIL("  fflush failed: errno=%d (%s)\n", errno, strerror(errno));
         fclose(fp);
         fp = NULL;
@@ -363,7 +387,8 @@ mounted:
         goto cleanup;
     }
 
-    if (fclose(fp) != 0) {
+    if (fclose(fp) != 0)
+    {
         fp = NULL;
         HWTEST_DETAIL("  fclose(write) failed: errno=%d (%s)\n", errno, strerror(errno));
         err = ESP_FAIL;
@@ -372,7 +397,8 @@ mounted:
     fp = NULL;
 
     fp = fopen(HWTEST_SD_FILE, "rb");
-    if (fp == NULL) {
+    if (fp == NULL)
+    {
         HWTEST_DETAIL("  fopen(read) failed: errno=%d (%s)\n", errno, strerror(errno));
         err = ESP_FAIL;
         goto cleanup;
@@ -380,32 +406,37 @@ mounted:
 
     for (size_t offset = 0U;
          offset < HWTEST_SD_TEST_BYTES;
-         offset += sizeof(block)) {
+         offset += sizeof(block))
+    {
         size_t n = HWTEST_SD_TEST_BYTES - offset;
-        if (n > sizeof(block)) {
+        if (n > sizeof(block))
+        {
             n = sizeof(block);
         }
 
         memset(block, 0, sizeof(block));
         size_t got = fread(block, 1U, n, fp);
-        if (got != n) {
+        if (got != n)
+        {
             HWTEST_DETAIL("  SD read failed at offset %u: expected=%u got=%u\n",
-                   (unsigned)offset,
-                   (unsigned)n,
-                   (unsigned)got);
+                          (unsigned)offset,
+                          (unsigned)n,
+                          (unsigned)got);
             fclose(fp);
             fp = NULL;
             err = ESP_FAIL;
             goto cleanup;
         }
 
-        for (size_t i = 0U; i < n; ++i) {
+        for (size_t i = 0U; i < n; ++i)
+        {
             uint8_t expected = sd_pattern_byte(offset + i);
-            if (block[i] != expected) {
+            if (block[i] != expected)
+            {
                 HWTEST_DETAIL("  verify mismatch at offset %u: expected=0x%02X got=0x%02X\n",
-                       (unsigned)(offset + i),
-                       (unsigned)expected,
-                       (unsigned)block[i]);
+                              (unsigned)(offset + i),
+                              (unsigned)expected,
+                              (unsigned)block[i]);
                 fclose(fp);
                 fp = NULL;
                 err = ESP_FAIL;
@@ -418,30 +449,37 @@ mounted:
     fp = NULL;
 
     HWTEST_DETAIL("  Write/read/verify: %u bytes OK\n",
-           (unsigned)HWTEST_SD_TEST_BYTES);
+                  (unsigned)HWTEST_SD_TEST_BYTES);
     err = ESP_OK;
 
 cleanup:
-    if (fp != NULL) {
+    if (fp != NULL)
+    {
         fclose(fp);
     }
 
-    if (unlink(HWTEST_SD_FILE) != 0 && errno != ENOENT) {
+    if (unlink(HWTEST_SD_FILE) != 0 && errno != ENOENT)
+    {
         HWTEST_DETAIL("  warning: could not remove test file: %s\n", strerror(errno));
     }
 
-    if (premounted) {
+    if (premounted)
+    {
         return err;
     }
 
     esp_err_t unmount_err =
         esp_vfs_fat_sdcard_unmount(HWTEST_SD_MOUNT_POINT, card);
-    if (unmount_err != ESP_OK) {
+    if (unmount_err != ESP_OK)
+    {
         HWTEST_DETAIL("  SD unmount warning: %s\n", esp_err_to_name(unmount_err));
-        if (err == ESP_OK) {
+        if (err == ESP_OK)
+        {
             err = unmount_err;
         }
-    } else {
+    }
+    else
+    {
         HWTEST_DETAIL("  Card unmounted; shared SPI2 bus left active for W6100\n");
     }
 
@@ -477,12 +515,14 @@ static int uart_prepare_clean_rx(uart_port_t port)
     (void)uart_flush_input(port);
     vTaskDelay(pdMS_TO_TICKS(HWTEST_UART_SETTLE_MS));
 
-    for (;;) {
+    for (;;)
+    {
         int got = uart_read_bytes(port,
                                   junk,
                                   sizeof(junk),
                                   0);
-        if (got <= 0) {
+        if (got <= 0)
+        {
             break;
         }
         discarded += got;
@@ -497,12 +537,14 @@ static int uart_prepare_clean_rx(uart_port_t port)
      */
     vTaskDelay(pdMS_TO_TICKS(HWTEST_UART_DRAIN_GAP_MS));
 
-    for (;;) {
+    for (;;)
+    {
         int got = uart_read_bytes(port,
                                   junk,
                                   sizeof(junk),
                                   0);
-        if (got <= 0) {
+        if (got <= 0)
+        {
             break;
         }
         discarded += got;
@@ -520,12 +562,12 @@ static esp_err_t hwtest_uart(void)
     const uart_port_t port = LP_UART_NUM_0;
 
     HWTEST_DETAIL("  LP_UART0 TX=GPIO%d RX=GPIO%d, %d 8N1\n",
-           HWTEST_UART_TX_GPIO,
-           HWTEST_UART_RX_GPIO,
-           HWTEST_UART_BAUD);
+                  HWTEST_UART_TX_GPIO,
+                  HWTEST_UART_RX_GPIO,
+                  HWTEST_UART_BAUD);
     HWTEST_DETAIL("  Required loopback: connect GPIO%d (TX) -> GPIO%d (RX)\n",
-           HWTEST_UART_TX_GPIO,
-           HWTEST_UART_RX_GPIO);
+                  HWTEST_UART_TX_GPIO,
+                  HWTEST_UART_RX_GPIO);
 
     uart_config_t cfg = {
         .baud_rate = HWTEST_UART_BAUD,
@@ -544,9 +586,11 @@ static esp_err_t hwtest_uart(void)
                                         0,
                                         NULL,
                                         0);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  LP UART driver install failed: %s\n", esp_err_to_name(err));
-        if (err == ESP_ERR_INVALID_STATE) {
+        if (err == ESP_ERR_INVALID_STATE)
+        {
             HWTEST_DETAIL("  LP UART is already owned by another service.\n");
         }
         return err;
@@ -554,7 +598,8 @@ static esp_err_t hwtest_uart(void)
     installed = true;
 
     err = uart_param_config(port, &cfg);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  uart_param_config failed: %s\n", esp_err_to_name(err));
         goto cleanup;
     }
@@ -568,7 +613,8 @@ static esp_err_t hwtest_uart(void)
                        HWTEST_UART_RX_GPIO,
                        UART_PIN_NO_CHANGE,
                        UART_PIN_NO_CHANGE);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  uart_set_pin failed: %s\n", esp_err_to_name(err));
         goto cleanup;
     }
@@ -583,10 +629,12 @@ static esp_err_t hwtest_uart(void)
      */
     err = ESP_FAIL;
 
-    for (int attempt = 1; attempt <= HWTEST_UART_MAX_ATTEMPTS; ++attempt) {
+    for (int attempt = 1; attempt <= HWTEST_UART_MAX_ATTEMPTS; ++attempt)
+    {
         int discarded = uart_prepare_clean_rx(port);
 
-        if (discarded > 0) {
+        if (discarded > 0)
+        {
             HWTEST_DETAIL("  RX cleanup discarded %d startup byte(s)\n", discarded);
         }
 
@@ -596,21 +644,23 @@ static esp_err_t hwtest_uart(void)
         int written = uart_write_bytes(port,
                                        (const char *)s_uart_pattern,
                                        sizeof(s_uart_pattern));
-        if (written != (int)sizeof(s_uart_pattern)) {
+        if (written != (int)sizeof(s_uart_pattern))
+        {
             HWTEST_DETAIL("  TX failed on attempt %d: expected=%u written=%d\n",
-                   attempt,
-                   (unsigned)sizeof(s_uart_pattern),
-                   written);
+                          attempt,
+                          (unsigned)sizeof(s_uart_pattern),
+                          written);
             err = ESP_FAIL;
             continue;
         }
 
         esp_err_t tx_err =
             uart_wait_tx_done(port, pdMS_TO_TICKS(HWTEST_TX_TIMEOUT_MS));
-        if (tx_err != ESP_OK) {
+        if (tx_err != ESP_OK)
+        {
             HWTEST_DETAIL("  TX completion failed on attempt %d: %s\n",
-                   attempt,
-                   esp_err_to_name(tx_err));
+                          attempt,
+                          esp_err_to_name(tx_err));
             err = tx_err;
             continue;
         }
@@ -621,13 +671,14 @@ static esp_err_t hwtest_uart(void)
                                      HWTEST_READ_TIMEOUT_MS);
 
         if (got == (int)sizeof(s_uart_pattern) &&
-            memcmp(rx, s_uart_pattern, sizeof(s_uart_pattern)) == 0) {
-
+            memcmp(rx, s_uart_pattern, sizeof(s_uart_pattern)) == 0)
+        {
             HWTEST_DETAIL("  Loopback verified: %u/%u bytes identical",
-                   (unsigned)sizeof(s_uart_pattern),
-                   (unsigned)sizeof(s_uart_pattern));
+                          (unsigned)sizeof(s_uart_pattern),
+                          (unsigned)sizeof(s_uart_pattern));
 
-            if (attempt > 1) {
+            if (attempt > 1)
+            {
                 HWTEST_DETAIL(" (attempt %d)", attempt);
             }
 
@@ -642,13 +693,15 @@ static esp_err_t hwtest_uart(void)
                        sizeof(s_uart_pattern),
                        got > 0 ? (size_t)got : 0U);
 
-        if (attempt < HWTEST_UART_MAX_ATTEMPTS) {
+        if (attempt < HWTEST_UART_MAX_ATTEMPTS)
+        {
             HWTEST_DETAIL("  Re-cleaning LP-UART RX and retrying once...\n");
         }
     }
 
 cleanup:
-    if (installed) {
+    if (installed)
+    {
         (void)uart_driver_delete(port);
     }
     return err;
@@ -682,13 +735,15 @@ static esp_err_t rs485_ch1_init(bool *installed)
                                         0,
                                         NULL,
                                         0);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
     *installed = true;
 
     err = uart_param_config(HWTEST_RS485_1_UART, &cfg);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
@@ -697,7 +752,8 @@ static esp_err_t rs485_ch1_init(bool *installed)
                        HWTEST_RS485_1_RX_GPIO,
                        HWTEST_RS485_1_DIR_GPIO,
                        UART_PIN_NO_CHANGE);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
@@ -725,13 +781,15 @@ static esp_err_t rs485_ch2_init(bool *installed)
                                         0,
                                         NULL,
                                         0);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
     *installed = true;
 
     err = uart_param_config(HWTEST_RS485_2_UART, &cfg);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
@@ -744,7 +802,8 @@ static esp_err_t rs485_ch2_init(bool *installed)
                        HWTEST_RS485_2_RX_GPIO,
                        UART_PIN_NO_CHANGE,
                        UART_PIN_NO_CHANGE);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
@@ -756,7 +815,8 @@ static esp_err_t rs485_ch2_init(bool *installed)
         .intr_type = GPIO_INTR_DISABLE,
     };
     err = gpio_config(&dir_cfg);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
@@ -765,39 +825,44 @@ static esp_err_t rs485_ch2_init(bool *installed)
 
 static esp_err_t hwtest_rs485(void)
 {
-    if (!rs485_configured()) {
+    if (!rs485_configured())
+    {
         HWTEST_DETAIL("  RS-485 lines are not configured (board keys rs485.1.* and rs485.2.*)\n");
         return ESP_ERR_NOT_SUPPORTED;
     }
     HWTEST_DETAIL("\n[RS-485 PAIR]\n");
     HWTEST_DETAIL("  CH1 UART1: TX=%d RX=%d RTS/DE=%d, %d 8N1\n",
-           HWTEST_RS485_1_TX_GPIO,
-           HWTEST_RS485_1_RX_GPIO,
-           HWTEST_RS485_1_DIR_GPIO,
-           HWTEST_RS485_BAUD);
+                  HWTEST_RS485_1_TX_GPIO,
+                  HWTEST_RS485_1_RX_GPIO,
+                  HWTEST_RS485_1_DIR_GPIO,
+                  HWTEST_RS485_BAUD);
     HWTEST_DETAIL("  CH2 UART0: TX=%d RX=%d DIR/DE=%d, %d 8N1\n",
-           HWTEST_RS485_2_TX_GPIO,
-           HWTEST_RS485_2_RX_GPIO,
-           HWTEST_RS485_2_DIR_GPIO,
-           HWTEST_RS485_BAUD);
+                  HWTEST_RS485_2_TX_GPIO,
+                  HWTEST_RS485_2_RX_GPIO,
+                  HWTEST_RS485_2_DIR_GPIO,
+                  HWTEST_RS485_BAUD);
     HWTEST_DETAIL("  Required loopback: CH1 A->CH2 A, CH1 B->CH2 B, GND->GND\n");
 
     bool ch1_installed = false;
     bool ch2_installed = false;
 
     esp_err_t err = rs485_ch1_init(&ch1_installed);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  RS485-1 init failed: %s\n", esp_err_to_name(err));
-        if (err == ESP_ERR_INVALID_STATE) {
+        if (err == ESP_ERR_INVALID_STATE)
+        {
             HWTEST_DETAIL("  UART1 is already owned by another service.\n");
         }
         goto cleanup;
     }
 
     err = rs485_ch2_init(&ch2_installed);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  RS485-2 init failed: %s\n", esp_err_to_name(err));
-        if (err == ESP_ERR_INVALID_STATE) {
+        if (err == ESP_ERR_INVALID_STATE)
+        {
             HWTEST_DETAIL("  UART0 is already owned by another service.\n");
         }
         goto cleanup;
@@ -810,17 +875,19 @@ static esp_err_t hwtest_rs485(void)
     int written = uart_write_bytes(HWTEST_RS485_1_UART,
                                    (const char *)s_rs485_1_to_2,
                                    sizeof(s_rs485_1_to_2));
-    if (written != (int)sizeof(s_rs485_1_to_2)) {
+    if (written != (int)sizeof(s_rs485_1_to_2))
+    {
         HWTEST_DETAIL("  CH1->CH2 TX failed: expected=%u written=%d\n",
-               (unsigned)sizeof(s_rs485_1_to_2),
-               written);
+                      (unsigned)sizeof(s_rs485_1_to_2),
+                      written);
         err = ESP_FAIL;
         goto cleanup;
     }
 
     err = uart_wait_tx_done(HWTEST_RS485_1_UART,
                             pdMS_TO_TICKS(HWTEST_TX_TIMEOUT_MS));
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  CH1 TX completion failed: %s\n", esp_err_to_name(err));
         goto cleanup;
     }
@@ -833,7 +900,8 @@ static esp_err_t hwtest_rs485(void)
                                    sizeof(rx12),
                                    HWTEST_READ_TIMEOUT_MS);
     if (got12 != (int)sizeof(s_rs485_1_to_2) ||
-        memcmp(rx12, s_rs485_1_to_2, sizeof(s_rs485_1_to_2)) != 0) {
+        memcmp(rx12, s_rs485_1_to_2, sizeof(s_rs485_1_to_2)) != 0)
+    {
         HWTEST_DETAIL("  CH1 -> CH2 verify FAILED\n");
         print_mismatch(s_rs485_1_to_2,
                        rx12,
@@ -844,7 +912,7 @@ static esp_err_t hwtest_rs485(void)
     }
 
     HWTEST_DETAIL("  CH1 -> CH2: %u bytes verified\n",
-           (unsigned)sizeof(s_rs485_1_to_2));
+                  (unsigned)sizeof(s_rs485_1_to_2));
 
     /* Clear any echo/noise before testing the opposite direction. */
     (void)uart_flush_input(HWTEST_RS485_1_UART);
@@ -852,7 +920,8 @@ static esp_err_t hwtest_rs485(void)
 
     /* ---------------- CH2 -> CH1 ---------------- */
     err = gpio_set_level(HWTEST_RS485_2_DIR_GPIO, 1); /* TX */
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  CH2 direction -> TX failed: %s\n", esp_err_to_name(err));
         goto cleanup;
     }
@@ -862,10 +931,11 @@ static esp_err_t hwtest_rs485(void)
     written = uart_write_bytes(HWTEST_RS485_2_UART,
                                (const char *)s_rs485_2_to_1,
                                sizeof(s_rs485_2_to_1));
-    if (written != (int)sizeof(s_rs485_2_to_1)) {
+    if (written != (int)sizeof(s_rs485_2_to_1))
+    {
         HWTEST_DETAIL("  CH2->CH1 TX failed: expected=%u written=%d\n",
-               (unsigned)sizeof(s_rs485_2_to_1),
-               written);
+                      (unsigned)sizeof(s_rs485_2_to_1),
+                      written);
         (void)gpio_set_level(HWTEST_RS485_2_DIR_GPIO, 0);
         err = ESP_FAIL;
         goto cleanup;
@@ -881,7 +951,8 @@ static esp_err_t hwtest_rs485(void)
     vTaskDelay(pdMS_TO_TICKS(2));
     (void)gpio_set_level(HWTEST_RS485_2_DIR_GPIO, 0); /* RX */
 
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         HWTEST_DETAIL("  CH2 TX completion failed: %s\n", esp_err_to_name(err));
         goto cleanup;
     }
@@ -894,7 +965,8 @@ static esp_err_t hwtest_rs485(void)
                                    sizeof(rx21),
                                    HWTEST_READ_TIMEOUT_MS);
     if (got21 != (int)sizeof(s_rs485_2_to_1) ||
-        memcmp(rx21, s_rs485_2_to_1, sizeof(s_rs485_2_to_1)) != 0) {
+        memcmp(rx21, s_rs485_2_to_1, sizeof(s_rs485_2_to_1)) != 0)
+    {
         HWTEST_DETAIL("  CH2 -> CH1 verify FAILED\n");
         print_mismatch(s_rs485_2_to_1,
                        rx21,
@@ -905,7 +977,7 @@ static esp_err_t hwtest_rs485(void)
     }
 
     HWTEST_DETAIL("  CH2 -> CH1: %u bytes verified\n",
-           (unsigned)sizeof(s_rs485_2_to_1));
+                  (unsigned)sizeof(s_rs485_2_to_1));
     err = ESP_OK;
 
 cleanup:
@@ -915,10 +987,12 @@ cleanup:
      */
     (void)gpio_set_level(HWTEST_RS485_2_DIR_GPIO, 0);
 
-    if (ch2_installed) {
+    if (ch2_installed)
+    {
         (void)uart_driver_delete(HWTEST_RS485_2_UART);
     }
-    if (ch1_installed) {
+    if (ch1_installed)
+    {
         (void)uart_driver_delete(HWTEST_RS485_1_UART);
     }
 
@@ -931,8 +1005,10 @@ cleanup:
 
 static void print_pin_line(const char *label, const char *bus, int a, int b, int c, int d)
 {
-    if (a < 0 || b < 0 || c < 0 || d < 0) printf("%s: not configured\n", label);
-    else printf("%s: %s %d %d %d %d\n", label, bus, a, b, c, d);
+    if (a < 0 || b < 0 || c < 0 || d < 0)
+        printf("%s: not configured\n", label);
+    else
+        printf("%s: %s %d %d %d %d\n", label, bus, a, b, c, d);
 }
 
 static void hwtest_print_status(void)
@@ -959,12 +1035,14 @@ static void hwtest_print_status(void)
 static int run_named_test(const char *name, esp_err_t (*fn)(void))
 {
     esp_err_t err = fn();
-    if (err == ESP_ERR_NOT_SUPPORTED) {        /* not configured / not on this chip */
+    if (err == ESP_ERR_NOT_SUPPORTED)
+    {        /* not configured / not on this chip */
         printf("[SKIP] %s\n", name);
         return 0;
     }
     print_result(name, err == ESP_OK);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         printf("  error: %s (0x%x)\n",
                esp_err_to_name(err),
                (unsigned)err);
@@ -980,7 +1058,8 @@ static int run_named_test(const char *name, esp_err_t (*fn)(void))
 
 static bool parse_repeat_count(const char *text, uint32_t *count_out)
 {
-    if (text == NULL || count_out == NULL || *text == '\0') {
+    if (text == NULL || count_out == NULL || *text == '\0')
+    {
         return false;
     }
 
@@ -992,7 +1071,8 @@ static bool parse_repeat_count(const char *text, uint32_t *count_out)
         end == text ||
         *end != '\0' ||
         value == 0UL ||
-        value > HWTEST_REPEAT_MAX) {
+        value > HWTEST_REPEAT_MAX)
+    {
         return false;
     }
 
@@ -1002,12 +1082,14 @@ static bool parse_repeat_count(const char *text, uint32_t *count_out)
 
 static bool should_print_progress(uint32_t done, uint32_t total)
 {
-    if (total < 20U || done == total) {
+    if (total < 20U || done == total)
+    {
         return false;
     }
 
     uint32_t interval = total / HWTEST_PROGRESS_STEPS;
-    if (interval == 0U) {
+    if (interval == 0U)
+    {
         interval = 1U;
     }
 
@@ -1029,7 +1111,8 @@ static int run_repeat_test(const char *name,
                            esp_err_t (*fn)(void),
                            uint32_t count)
 {
-    if (count == 1U) {
+    if (count == 1U)
+    {
         return run_named_test(name, fn);
     }
 
@@ -1046,20 +1129,26 @@ static int run_repeat_test(const char *name,
     bool previous_quiet = s_hwtest_quiet;
     s_hwtest_quiet = true;
 
-    for (uint32_t cycle = 1U; cycle <= count; ++cycle) {
+    for (uint32_t cycle = 1U; cycle <= count; ++cycle)
+    {
         esp_err_t err = fn();
 
-        if (err == ESP_OK) {
+        if (err == ESP_OK)
+        {
             ++passed;
-        } else {
+        }
+        else
+        {
             ++failed;
-            if (first_failed_cycle == 0U) {
+            if (first_failed_cycle == 0U)
+            {
                 first_failed_cycle = cycle;
                 first_error = err;
             }
         }
 
-        if (should_print_progress(cycle, count)) {
+        if (should_print_progress(cycle, count))
+        {
             printf("  Progress: %u/%u cycles, pass=%u fail=%u\n",
                    (unsigned)cycle,
                    (unsigned)count,
@@ -1086,7 +1175,8 @@ static int run_repeat_test(const char *name,
     printf("Failed:        %u\n", (unsigned)failed);
     printf("Elapsed:       %.3f s\n", elapsed_s);
 
-    if (first_failed_cycle != 0U) {
+    if (first_failed_cycle != 0U)
+    {
         printf("First failure: cycle %u, %s (0x%x)\n",
                (unsigned)first_failed_cycle,
                esp_err_to_name(first_error),
@@ -1106,7 +1196,8 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv)
     hwtest_load_pins();
 
     if (argc == 1 ||
-        (argc == 2 && strcmp(argv[1], "status") == 0)) {
+        (argc == 2 && strcmp(argv[1], "status") == 0))
+    {
         hwtest_print_status();
         printf("\nusage:\n");
         printf("  hwtest status\n");
@@ -1118,15 +1209,18 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv)
         return 0;
     }
 
-    if (argc < 2 || argc > 3) {
+    if (argc < 2 || argc > 3)
+    {
         printf("usage: hwtest <sd|uart|rs485> [count] | hwtest <status|all>\n");
         return 2;
     }
 
     uint32_t count = 1U;
 
-    if (argc == 3) {
-        if (!parse_repeat_count(argv[2], &count)) {
+    if (argc == 3)
+    {
+        if (!parse_repeat_count(argv[2], &count))
+        {
             printf("hwtest: invalid count '%s' (valid range: 1..%u)\n",
                    argv[2],
                    (unsigned)HWTEST_REPEAT_MAX);
@@ -1134,20 +1228,25 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv)
         }
     }
 
-    if (strcmp(argv[1], "sd") == 0) {
+    if (strcmp(argv[1], "sd") == 0)
+    {
         return run_repeat_test("SD", hwtest_sd, count);
     }
 
-    if (strcmp(argv[1], "uart") == 0) {
+    if (strcmp(argv[1], "uart") == 0)
+    {
         return run_repeat_test("UART", hwtest_uart, count);
     }
 
-    if (strcmp(argv[1], "rs485") == 0) {
+    if (strcmp(argv[1], "rs485") == 0)
+    {
         return run_repeat_test("RS485", hwtest_rs485, count);
     }
 
-    if (strcmp(argv[1], "all") == 0) {
-        if (argc != 2) {
+    if (strcmp(argv[1], "all") == 0)
+    {
+        if (argc != 2)
+        {
             printf("hwtest: 'all' does not accept a repeat count\n");
             return 2;
         }
@@ -1165,8 +1264,7 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv)
 
         printf("\n============================================================\n");
         printf("RESULT: %s (%d failure%s)\n",
-               failures == 0 ? "ALL HARDWARE TESTS PASSED" :
-                               "HARDWARE TEST FAILED",
+               failures == 0 ? "ALL HARDWARE TESTS PASSED" : "HARDWARE TEST FAILED",
                failures,
                failures == 1 ? "" : "s");
         printf("============================================================\n");
@@ -1177,4 +1275,3 @@ int tdsh_cmd_hwtest(tdsh_session_t *session, int argc, char **argv)
     printf("usage: hwtest <sd|uart|rs485> [count] | hwtest <status|all>\n");
     return 2;
 }
-

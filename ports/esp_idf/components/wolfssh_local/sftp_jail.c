@@ -17,10 +17,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define SLOTS 4
+#define SLOTS    4
 #define ROOT_MAX 160
 
-static struct {
+static struct
+{
     TaskHandle_t task;
     char root[ROOT_MAX];
 } s_slots[SLOTS];
@@ -30,10 +31,13 @@ void tdsh_sftp_jail_enter(const char *root)
 {
     TaskHandle_t me = xTaskGetCurrentTaskHandle();
     tdsh_sftp_jail_leave();
-    if (!root) return;
+    if (!root)
+        return;
     taskENTER_CRITICAL(&s_mux);
-    for (int i = 0; i < SLOTS; i++) {
-        if (s_slots[i].task) continue;
+    for (int i = 0; i < SLOTS; i++)
+    {
+        if (s_slots[i].task)
+            continue;
         s_slots[i].task = me;
         snprintf(s_slots[i].root, sizeof(s_slots[i].root), "%s", root);
         break;
@@ -46,7 +50,8 @@ void tdsh_sftp_jail_leave(void)
     TaskHandle_t me = xTaskGetCurrentTaskHandle();
     taskENTER_CRITICAL(&s_mux);
     for (int i = 0; i < SLOTS; i++)
-        if (s_slots[i].task == me) s_slots[i].task = NULL;
+        if (s_slots[i].task == me)
+            s_slots[i].task = NULL;
     taskEXIT_CRITICAL(&s_mux);
 }
 
@@ -56,8 +61,10 @@ static bool my_root(char *out, size_t cap)
     TaskHandle_t me = xTaskGetCurrentTaskHandle();
     bool found = false;
     taskENTER_CRITICAL(&s_mux);
-    for (int i = 0; i < SLOTS && !found; i++) {
-        if (s_slots[i].task != me) continue;
+    for (int i = 0; i < SLOTS && !found; i++)
+    {
+        if (s_slots[i].task != me)
+            continue;
         snprintf(out, cap, "%s", s_slots[i].root);
         found = true;
     }
@@ -68,30 +75,41 @@ static bool my_root(char *out, size_t cap)
 /* Resolve ".", ".." and repeated slashes of an absolute path. */
 static bool normalise(const char *in, char *out, size_t cap)
 {
-    if (!in || in[0] != '/') return false;
+    if (!in || in[0] != '/')
+        return false;
     size_t len = 0;
     out[0] = '\0';
     const char *p = in;
-    while (*p) {
-        while (*p == '/') p++;
+    while (*p)
+    {
+        while (*p == '/')
+            p++;
         const char *seg = p;
-        while (*p && *p != '/') p++;
+        while (*p && *p != '/')
+            p++;
         size_t n = (size_t)(p - seg);
-        if (n == 0 || (n == 1 && seg[0] == '.')) continue;
-        if (n == 2 && seg[0] == '.' && seg[1] == '.') {
-            while (len > 0 && out[len - 1] != '/') len--;    /* drop last part */
-            if (len > 0) len--;                               /* and its slash */
+        if (n == 0 || (n == 1 && seg[0] == '.'))
+            continue;
+        if (n == 2 && seg[0] == '.' && seg[1] == '.')
+        {
+            while (len > 0 && out[len - 1] != '/')
+                len--;    /* drop last part */
+            if (len > 0)
+                len--;                               /* and its slash */
             out[len] = '\0';
             continue;
         }
-        if (len + 1 + n + 1 > cap) return false;
+        if (len + 1 + n + 1 > cap)
+            return false;
         out[len++] = '/';
         memcpy(out + len, seg, n);
         len += n;
         out[len] = '\0';
     }
-    if (len == 0) {
-        if (cap < 2) return false;
+    if (len == 0)
+    {
+        if (cap < 2)
+            return false;
         out[0] = '/';
         out[1] = '\0';
     }
@@ -101,16 +119,22 @@ static bool normalise(const char *in, char *out, size_t cap)
 bool tdsh_sftp_allowed(const char *path, bool metadata_only)
 {
     char root[ROOT_MAX], norm[ROOT_MAX + 96];
-    if (!my_root(root, sizeof(root))) return true;       /* not jailed */
-    if (!normalise(path, norm, sizeof(norm))) return false;
+    if (!my_root(root, sizeof(root)))
+        return true;       /* not jailed */
+    if (!normalise(path, norm, sizeof(norm)))
+        return false;
     size_t rl = strlen(root);
-    if (strncmp(norm, root, rl) == 0 && (norm[rl] == '\0' || norm[rl] == '/')) return true;
+    if (strncmp(norm, root, rl) == 0 && (norm[rl] == '\0' || norm[rl] == '/'))
+        return true;
     /* Looking at the directories above the home (to show where it is) is
      * harmless; listing or changing them is not. */
-    if (metadata_only) {
+    if (metadata_only)
+    {
         size_t nl = strlen(norm);
-        if (strcmp(norm, "/") == 0) return true;
-        if (nl < rl && strncmp(root, norm, nl) == 0 && root[nl] == '/') return true;
+        if (strcmp(norm, "/") == 0)
+            return true;
+        if (nl < rl && strncmp(root, norm, nl) == 0 && root[nl] == '/')
+            return true;
     }
     return false;
 }

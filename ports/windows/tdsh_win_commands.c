@@ -28,7 +28,8 @@
 static int usage(const char *name)
 {
     const tdsh_command_t *c = tdsh_command_find(name);
-    if (c) printf("usage: %s\n", c->usage);
+    if (c)
+        printf("usage: %s\n", c->usage);
     return 2;
 }
 
@@ -36,39 +37,52 @@ static int usage(const char *name)
 
 static int cmd_ifconfig(tdsh_session_t *s, int argc, char **argv)
 {
-    (void)s; (void)argv;
-    if (argc != 1) return usage("ifconfig");
+    (void)s;
+    (void)argv;
+    if (argc != 1)
+        return usage("ifconfig");
     ULONG size = 16 * 1024;
     IP_ADAPTER_ADDRESSES *list = NULL;
     ULONG rc = ERROR_BUFFER_OVERFLOW;
-    for (int tries = 0; tries < 3 && rc == ERROR_BUFFER_OVERFLOW; tries++) {
+    for (int tries = 0; tries < 3 && rc == ERROR_BUFFER_OVERFLOW; tries++)
+    {
         free(list);
         list = malloc(size);
-        if (!list) { puts("ifconfig: out of memory"); return 1; }
+        if (!list)
+        {
+            puts("ifconfig: out of memory");
+            return 1;
+        }
         rc = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
                                   NULL, list, &size);
     }
-    if (rc != NO_ERROR) {
+    if (rc != NO_ERROR)
+    {
         printf("ifconfig: GetAdaptersAddresses failed (%lu)\n", (unsigned long)rc);
         free(list);
         return 1;
     }
-    for (IP_ADAPTER_ADDRESSES *a = list; a; a = a->Next) {
-        if (a->OperStatus != IfOperStatusUp || !a->FirstUnicastAddress) continue;
+    for (IP_ADAPTER_ADDRESSES *a = list; a; a = a->Next)
+    {
+        if (a->OperStatus != IfOperStatusUp || !a->FirstUnicastAddress)
+            continue;
         char name[128];
         if (!WideCharToMultiByte(CP_UTF8, 0, a->FriendlyName, -1, name, sizeof(name), NULL, NULL))
             snprintf(name, sizeof(name), "%s", a->AdapterName);
         printf("%s\n", name);
-        if (a->PhysicalAddressLength == 6) {
+        if (a->PhysicalAddressLength == 6)
+        {
             const BYTE *m = a->PhysicalAddress;
             printf("    ether %02x:%02x:%02x:%02x:%02x:%02x\n", m[0], m[1], m[2], m[3], m[4], m[5]);
         }
-        for (IP_ADAPTER_UNICAST_ADDRESS *u = a->FirstUnicastAddress; u; u = u->Next) {
+        for (IP_ADAPTER_UNICAST_ADDRESS *u = a->FirstUnicastAddress; u; u = u->Next)
+        {
             int fam = u->Address.lpSockaddr->sa_family;
             char text[INET6_ADDRSTRLEN] = "";
             const void *src = fam == AF_INET ? (const void *)&((struct sockaddr_in *)u->Address.lpSockaddr)->sin_addr
                                              : (const void *)&((struct sockaddr_in6 *)u->Address.lpSockaddr)->sin6_addr;
-            if (!inet_ntop(fam, src, text, sizeof(text))) continue;
+            if (!inet_ntop(fam, src, text, sizeof(text)))
+                continue;
             printf("    %s %s/%u\n", fam == AF_INET ? "inet " : "inet6", text, (unsigned)u->OnLinkPrefixLength);
         }
     }
@@ -83,23 +97,39 @@ static int cmd_ping(tdsh_session_t *s, int argc, char **argv)
     (void)s;
     int count = 4;
     const char *host = NULL;
-    for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-c") && i + 1 < argc) {
+    for (int i = 1; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "-c") && i + 1 < argc)
+        {
             count = atoi(argv[++i]);
-            if (count < 1 || count > 100) { puts("ping: -c takes 1 to 100"); return 2; }
-        } else if (!host) {
+            if (count < 1 || count > 100)
+            {
+                puts("ping: -c takes 1 to 100");
+                return 2;
+            }
+        }
+        else if (!host)
+        {
             host = argv[i];
-        } else {
+        }
+        else
+        {
             return usage("ping");
         }
     }
-    if (!host) return usage("ping");
+    if (!host)
+        return usage("ping");
 
     WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { puts("ping: network not available"); return 1; }
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+    {
+        puts("ping: network not available");
+        return 1;
+    }
     struct addrinfo hints = {0}, *res = NULL;
     hints.ai_family = AF_INET;
-    if (getaddrinfo(host, NULL, &hints, &res) != 0 || !res) {
+    if (getaddrinfo(host, NULL, &hints, &res) != 0 || !res)
+    {
         printf("ping: cannot resolve %s\n", host);
         WSACleanup();
         return 1;
@@ -110,33 +140,46 @@ static int cmd_ping(tdsh_session_t *s, int argc, char **argv)
     freeaddrinfo(res);
 
     HANDLE icmp = IcmpCreateFile();
-    if (icmp == INVALID_HANDLE_VALUE) { puts("ping: cannot open ICMP"); WSACleanup(); return 1; }
+    if (icmp == INVALID_HANDLE_VALUE)
+    {
+        puts("ping: cannot open ICMP");
+        WSACleanup();
+        return 1;
+    }
     char payload[32];
     memset(payload, 'a', sizeof(payload));
     unsigned char reply[sizeof(ICMP_ECHO_REPLY) + sizeof(payload) + 64];
     printf("PING %s (%s): %u data bytes\n", host, text, (unsigned)sizeof(payload));
     int received = 0;
     unsigned long min_ms = (unsigned long)-1, max_ms = 0, sum_ms = 0;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         DWORD n = IcmpSendEcho(icmp, dest, payload, sizeof(payload), NULL, reply, sizeof(reply), 1000);
         ICMP_ECHO_REPLY *r = (ICMP_ECHO_REPLY *)reply;
-        if (n > 0 && r->Status == IP_SUCCESS) {
+        if (n > 0 && r->Status == IP_SUCCESS)
+        {
             received++;
             unsigned long ms = r->RoundTripTime;
-            if (ms < min_ms) min_ms = ms;
-            if (ms > max_ms) max_ms = ms;
+            if (ms < min_ms)
+                min_ms = ms;
+            if (ms > max_ms)
+                max_ms = ms;
             sum_ms += ms;
             printf("%u bytes from %s: seq=%d ttl=%u time=%lu ms\n", (unsigned)r->DataSize, text, i + 1,
                    (unsigned)r->Options.Ttl, ms);
-        } else {
+        }
+        else
+        {
             printf("no reply from %s: seq=%d\n", text, i + 1);
         }
-        if (i + 1 < count) Sleep(1000);
+        if (i + 1 < count)
+            Sleep(1000);
     }
     IcmpCloseHandle(icmp);
     WSACleanup();
     printf("--- %s: %d sent, %d received, %d%% loss", host, count, received, (count - received) * 100 / count);
-    if (received) printf(", time min/avg/max %lu/%lu/%lu ms", min_ms, sum_ms / (unsigned long)received, max_ms);
+    if (received)
+        printf(", time min/avg/max %lu/%lu/%lu ms", min_ms, sum_ms / (unsigned long)received, max_ms);
     printf("\n");
     return received ? 0 : 1;
 }
@@ -163,26 +206,46 @@ static long tz_offset(tdsh_session_t *s)
 {
     char real[TDSH_MAX_REAL_PATH];
     long v = pc_offset();
-    if (!tz_path(s, real, sizeof(real))) return v;
+    if (!tz_path(s, real, sizeof(real)))
+        return v;
     FILE *f = fopen(real, "r");
-    if (!f) return v;
-    if (fscanf(f, "%ld", &v) != 1) v = pc_offset();
+    if (!f)
+        return v;
+    if (fscanf(f, "%ld", &v) != 1)
+        v = pc_offset();
     fclose(f);
     return v;
 }
 
 static int cmd_tz(tdsh_session_t *s, int argc, char **argv)
 {
-    if (argc > 2) return usage("tz");
-    if (argc == 2) {
+    if (argc > 2)
+        return usage("tz");
+    if (argc == 2)
+    {
         int sign = 1, h = 0, m = 0;
         const char *p = argv[1];
-        if (*p == '-') { sign = -1; p++; } else if (*p == '+') p++;
-        if (sscanf(p, "%d:%d", &h, &m) != 2 || h > 14 || m > 59) { puts("tz: expected [+|-]HH:MM"); return 1; }
+        if (*p == '-')
+        {
+            sign = -1;
+            p++;
+        }
+        else if (*p == '+')
+            p++;
+        if (sscanf(p, "%d:%d", &h, &m) != 2 || h > 14 || m > 59)
+        {
+            puts("tz: expected [+|-]HH:MM");
+            return 1;
+        }
         char real[TDSH_MAX_REAL_PATH];
-        if (!tz_path(s, real, sizeof(real))) return 1;
+        if (!tz_path(s, real, sizeof(real)))
+            return 1;
         FILE *f = fopen(real, "w");
-        if (!f) { printf("tz: %s\n", strerror(errno)); return 1; }
+        if (!f)
+        {
+            printf("tz: %s\n", strerror(errno));
+            return 1;
+        }
         fprintf(f, "%ld\n", sign * (h * 3600L + m * 60L));
         fclose(f);
     }
@@ -200,9 +263,11 @@ static int local_tm(tdsh_session_t *s, struct tm *out)
 static int cmd_date(tdsh_session_t *s, int argc, char **argv)
 {
     (void)argv;
-    if (argc != 1) return usage("date");
+    if (argc != 1)
+        return usage("date");
     struct tm tm;
-    if (local_tm(s, &tm)) return 1;
+    if (local_tm(s, &tm))
+        return 1;
     char b[96];
     strftime(b, sizeof(b), "%a %d-%m-%Y %H:%M:%S", &tm);
     printf("%s\n", b);
@@ -212,21 +277,28 @@ static int cmd_date(tdsh_session_t *s, int argc, char **argv)
 static int cmd_cal(tdsh_session_t *s, int argc, char **argv)
 {
     (void)argv;
-    if (argc != 1) return usage("cal");
+    if (argc != 1)
+        return usage("cal");
     struct tm tm;
-    if (local_tm(s, &tm)) return 1;
+    if (local_tm(s, &tm))
+        return 1;
     int y = tm.tm_year + 1900, m = tm.tm_mon + 1;
     /* weekday of the 1st: Zeller-style from the known weekday of today */
     int first_wday = ((tm.tm_wday - (tm.tm_mday - 1) % 7) + 7) % 7;
     int days = 31;
-    if (m == 4 || m == 6 || m == 9 || m == 11) days = 30;
-    else if (m == 2) days = ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0) ? 29 : 28;
+    if (m == 4 || m == 6 || m == 9 || m == 11)
+        days = 30;
+    else if (m == 2)
+        days = ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0) ? 29 : 28;
     static const char *mn[] = {"January", "February", "March", "April", "May", "June", "July",
                                "August", "September", "October", "November", "December"};
     printf("     %s %d\nSu Mo Tu We Th Fr Sa\n", mn[m - 1], y);
-    for (int i = 0; i < first_wday; i++) printf("   ");
-    for (int d = 1; d <= days; d++) printf("%2d%c", d, ((first_wday + d) % 7) == 0 ? '\n' : ' ');
-    if ((first_wday + days) % 7) putchar('\n');
+    for (int i = 0; i < first_wday; i++)
+        printf("   ");
+    for (int d = 1; d <= days; d++)
+        printf("%2d%c", d, ((first_wday + d) % 7) == 0 ? '\n' : ' ');
+    if ((first_wday + days) % 7)
+        putchar('\n');
     return 0;
 }
 
@@ -234,48 +306,87 @@ static int cmd_cal(tdsh_session_t *s, int argc, char **argv)
 
 static int cmd_hostpath(tdsh_session_t *s, int argc, char **argv)
 {
-    if (argc > 2) return usage("hostpath");
+    if (argc > 2)
+        return usage("hostpath");
     char real[TDSH_MAX_REAL_PATH], logical[TDSH_MAX_PATH];
     const char *p = argc == 2 ? argv[1] : s->cwd;
     int rc = tdsh_path_to_real(s, p, real, sizeof(real), logical, sizeof(logical));
-    if (rc) { printf("hostpath: unable to resolve '%s' (%d)\n", p, rc); return 1; }
+    if (rc)
+    {
+        printf("hostpath: unable to resolve '%s' (%d)\n", p, rc);
+        return 1;
+    }
     printf("%s -> %s\n", logical, real);
     return 0;
 }
 
 static int cmd_write(tdsh_session_t *s, int argc, char **argv)
 {
-    if (argc < 2) return usage("write");
+    if (argc < 2)
+        return usage("write");
     char real[TDSH_MAX_REAL_PATH], logical[TDSH_MAX_PATH];
-    if (tdsh_path_to_real(s, argv[1], real, sizeof(real), logical, sizeof(logical)) != 0) {
+    if (tdsh_path_to_real(s, argv[1], real, sizeof(real), logical, sizeof(logical)) != 0)
+    {
         puts("write: invalid path");
         return 1;
     }
-    if (argc > 2) {
+    if (argc > 2)
+    {
         FILE *f = fopen(real, "w");
-        if (!f) { printf("write: %s: %s\n", logical, strerror(errno)); return 1; }
-        for (int i = 2; i < argc; i++) fprintf(f, "%s%s", argv[i], i + 1 < argc ? " " : "");
+        if (!f)
+        {
+            printf("write: %s: %s\n", logical, strerror(errno));
+            return 1;
+        }
+        for (int i = 2; i < argc; i++)
+            fprintf(f, "%s%s", argv[i], i + 1 < argc ? " " : "");
         fputc('\n', f);
         fclose(f);
         return 0;
     }
-    if (!s->interactive) { puts("write: interactive terminal required"); return 1; }
+    if (!s->interactive)
+    {
+        puts("write: interactive terminal required");
+        return 1;
+    }
     printf("TinyDesk Shell line writer: %s\nEnter lines; a line containing only .save finishes. .quit discards.\n", logical);
     char tmp[TDSH_MAX_REAL_PATH + 16];
     snprintf(tmp, sizeof(tmp), "%s.tmp", real);
     FILE *out = fopen(tmp, "w");
-    if (!out) { printf("write: %s\n", strerror(errno)); return 1; }
+    if (!out)
+    {
+        printf("write: %s\n", strerror(errno));
+        return 1;
+    }
     char line[TDSH_MAX_LINE + 2];
-    for (;;) {
+    for (;;)
+    {
         fputs("write> ", stdout);
         fflush(stdout);
-        if (!fgets(line, sizeof(line), stdin)) { fclose(out); remove(tmp); return 1; }
+        if (!fgets(line, sizeof(line), stdin))
+        {
+            fclose(out);
+            remove(tmp);
+            return 1;
+        }
         line[strcspn(line, "\r\n")] = '\0';
-        if (!strcmp(line, ".quit")) { fclose(out); remove(tmp); puts("Changes discarded."); return 0; }
-        if (!strcmp(line, ".save")) {
+        if (!strcmp(line, ".quit"))
+        {
+            fclose(out);
+            remove(tmp);
+            puts("Changes discarded.");
+            return 0;
+        }
+        if (!strcmp(line, ".save"))
+        {
             fclose(out);
             remove(real);                    /* rename() does not replace on Windows */
-            if (rename(tmp, real) != 0) { printf("write: save: %s\n", strerror(errno)); remove(tmp); return 1; }
+            if (rename(tmp, real) != 0)
+            {
+                printf("write: save: %s\n", strerror(errno));
+                remove(tmp);
+                return 1;
+            }
             printf("Saved %s\n", logical);
             return 0;
         }
@@ -285,8 +396,10 @@ static int cmd_write(tdsh_session_t *s, int argc, char **argv)
 
 static int cmd_caps(tdsh_session_t *s, int argc, char **argv)
 {
-    (void)s; (void)argv;
-    if (argc != 1) return usage("capabilities");
+    (void)s;
+    (void)argv;
+    if (argc != 1)
+        return usage("capabilities");
     puts("Windows capabilities:\n"
          "  portable shell/uScript/filesystem: yes\n"
          "  isolated TinyDesk Shell filesystem: yes (hostpath shows where)\n"

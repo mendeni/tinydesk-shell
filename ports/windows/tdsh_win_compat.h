@@ -39,44 +39,45 @@
 #include <unistd.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef int (*ushw_read_fn)(void *cookie, char *buf, int len);
-typedef int (*ushw_write_fn)(void *cookie, const char *buf, int len);
+    typedef int (*ushw_read_fn)(void *cookie, char *buf, int len);
+    typedef int (*ushw_write_fn)(void *cookie, const char *buf, int len);
 
 /* BSD-style funopen (seek is not supported and must be NULL). */
-FILE *ushw_funopen(const void *cookie, ushw_read_fn readfn, ushw_write_fn writefn,
-                   void *seekfn, int (*closefn)(void *));
+    FILE *ushw_funopen(const void *cookie, ushw_read_fn readfn, ushw_write_fn writefn,
+                       void *seekfn, int (*closefn)(void *));
 
 /* This thread's stdin (0), stdout (1) or stderr (2) slot. */
-FILE **ushw_std(int which);
+    FILE **ushw_std(int which);
 
 /* Copy the calling thread's slots so a new thread can inherit them. */
-void ushw_get_std(FILE *out[3]);
-void ushw_set_std(FILE *const in[3]);
+    void ushw_get_std(FILE *out[3]);
+    void ushw_set_std(FILE *const in[3]);
 
-int ushw_printf(const char *fmt, ...);
-int ushw_fprintf(FILE *f, const char *fmt, ...);
-int ushw_vprintf(const char *fmt, va_list ap);
-int ushw_vfprintf(FILE *f, const char *fmt, va_list ap);
-int ushw_puts(const char *s);
-int ushw_fputs(const char *s, FILE *f);
-int ushw_putchar(int c);
-int ushw_fputc(int c, FILE *f);
-int ushw_getchar(void);
-int ushw_fgetc(FILE *f);
-char *ushw_fgets(char *buf, int n, FILE *f);
-size_t ushw_fwrite(const void *p, size_t size, size_t n, FILE *f);
-size_t ushw_fread(void *p, size_t size, size_t n, FILE *f);
-int ushw_fflush(FILE *f);
-int ushw_fclose(FILE *f);
-int ushw_setvbuf(FILE *f, char *buf, int mode, size_t size);
-int ushw_ferror(FILE *f);
-int ushw_feof(FILE *f);
-void ushw_clearerr(FILE *f);
-void ushw_rewind(FILE *f);
-void ushw_perror(const char *s);
+    int ushw_printf(const char *fmt, ...);
+    int ushw_fprintf(FILE *f, const char *fmt, ...);
+    int ushw_vprintf(const char *fmt, va_list ap);
+    int ushw_vfprintf(FILE *f, const char *fmt, va_list ap);
+    int ushw_puts(const char *s);
+    int ushw_fputs(const char *s, FILE *f);
+    int ushw_putchar(int c);
+    int ushw_fputc(int c, FILE *f);
+    int ushw_getchar(void);
+    int ushw_fgetc(FILE *f);
+    char *ushw_fgets(char *buf, int n, FILE *f);
+    size_t ushw_fwrite(const void *p, size_t size, size_t n, FILE *f);
+    size_t ushw_fread(void *p, size_t size, size_t n, FILE *f);
+    int ushw_fflush(FILE *f);
+    int ushw_fclose(FILE *f);
+    int ushw_setvbuf(FILE *f, char *buf, int mode, size_t size);
+    int ushw_ferror(FILE *f);
+    int ushw_feof(FILE *f);
+    void ushw_clearerr(FILE *f);
+    void ushw_rewind(FILE *f);
+    void ushw_perror(const char *s);
 
 #ifdef __cplusplus
 }

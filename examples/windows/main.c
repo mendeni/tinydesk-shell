@@ -16,12 +16,14 @@
 static void clean_name(const char *in, char *out, size_t cap, const char *fallback)
 {
     size_t n = 0;
-    for (const char *p = in ? in : ""; *p && n + 1 < cap; p++) {
+    for (const char *p = in ? in : ""; *p && n + 1 < cap; p++)
+    {
         unsigned char c = (unsigned char)*p;
         out[n++] = (isalnum(c) || c == '.' || c == '_' || c == '-') ? (char)tolower(c) : '_';
     }
     out[n] = '\0';
-    if (!n) snprintf(out, cap, "%s", fallback);
+    if (!n)
+        snprintf(out, cap, "%s", fallback);
 }
 
 int main(void)
@@ -29,11 +31,15 @@ int main(void)
     char base[TDSH_MAX_REAL_PATH], root[TDSH_MAX_REAL_PATH];
     const char *appdata = getenv("LOCALAPPDATA");
     snprintf(base, sizeof(base), "%s/tdsh", appdata && appdata[0] ? appdata : ".");
-    for (char *p = base; *p; p++) if (*p == '\\') *p = '/';
+    for (char *p = base; *p; p++)
+        if (*p == '\\')
+            *p = '/';
     snprintf(root, sizeof(root), "%s/rootfs", base);
     /* Create every missing folder up to rootfs's parent (errors show below). */
-    for (char *p = base + 1; *p; p++) {
-        if (*p != '/' || p[-1] == ':') continue;
+    for (char *p = base + 1; *p; p++)
+    {
+        if (*p != '/' || p[-1] == ':')
+            continue;
         *p = '\0';
         mkdir(base, 0755);
         *p = '/';
@@ -45,13 +51,15 @@ int main(void)
     clean_name(getenv("COMPUTERNAME"), host, sizeof(host), "windows");
 
     int rc = tdsh_win_init_user(root, host, user);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         fprintf(stderr, "tdsh: cannot set up %s (error %d)\n", root, rc);
         return 1;
     }
     tdsh_session_t session;
     rc = tdsh_session_init(&session, user, true);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         fprintf(stderr, "tdsh: session start failed (%d)\n", rc);
         return 1;
     }

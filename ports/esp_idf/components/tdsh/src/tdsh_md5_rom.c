@@ -17,7 +17,16 @@
 
 _Static_assert(sizeof(md5_context_t) == 88, "MD5 context layout");
 
-void MD5Init(md5_context_t *ctx) { esp_rom_md5_init(ctx); }
-void MD5Update(md5_context_t *ctx, const unsigned char *buf, unsigned len) { esp_rom_md5_update(ctx, buf, len); }
-void MD5Final(unsigned char digest[16], md5_context_t *ctx) { esp_rom_md5_final(digest, ctx); }
+void MD5Init(md5_context_t *ctx)
+{
+    esp_rom_md5_init(ctx);
+}
+void MD5Update(md5_context_t *ctx, const unsigned char *buf, unsigned len)
+{
+    esp_rom_md5_update(ctx, buf, len);
+}
+void MD5Final(unsigned char digest[16], md5_context_t *ctx)
+{
+    esp_rom_md5_final(digest, ctx);
+}
 #endif

@@ -26,14 +26,15 @@
 #include "freertos/semphr.h"
 #include "sdmmc_cmd.h"
 
-#define SD_VFS          "/sd"
-#define SD_PLACEHOLDER  TDSH_MOUNT_POINT "/sd"
-#define SD_MAX_KHZ      10000
-#define SD_MAX_FILES    5
+#define SD_VFS         "/sd"
+#define SD_PLACEHOLDER TDSH_MOUNT_POINT "/sd"
+#define SD_MAX_KHZ     10000
+#define SD_MAX_FILES   5
 
 static const char *TAG = "tdsh-sd";
 
-typedef struct {
+typedef struct
+{
     int host, miso, mosi, sclk, cs;
 } sd_pins_t;
 
@@ -56,13 +57,16 @@ static bool pins_ok(const sd_pins_t *p)
 
 static void lock(void)
 {
-    if (!s_lock) s_lock = xSemaphoreCreateMutex();
-    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (!s_lock)
+        s_lock = xSemaphoreCreateMutex();
+    if (s_lock)
+        xSemaphoreTake(s_lock, portMAX_DELAY);
 }
 
 static void unlock(void)
 {
-    if (s_lock) xSemaphoreGive(s_lock);
+    if (s_lock)
+        xSemaphoreGive(s_lock);
 }
 
 /* The bus may already be up for the W6100 (or the other way round: the
@@ -102,16 +106,20 @@ bool tdsh_sdcard_configured(void)
 /* ESP-IDF logs routine details while a card is attached (the bus the W6100
  * already set up, CS pin setup, SDIO probes the card rejects): quiet them
  * for the mount; real failures come back as errors. */
-static const char *const QUIET_TAGS[] = { "spi", "gpio", "sdspi_transaction", "sdmmc_common" };
+static const char *const QUIET_TAGS[] = {"spi", "gpio", "sdspi_transaction", "sdmmc_common"};
 static esp_log_level_t s_saved[sizeof(QUIET_TAGS) / sizeof(QUIET_TAGS[0])];
 
 static void quiet_logs(bool on)
 {
-    for (size_t i = 0; i < sizeof(QUIET_TAGS) / sizeof(QUIET_TAGS[0]); ++i) {
-        if (on) {
+    for (size_t i = 0; i < sizeof(QUIET_TAGS) / sizeof(QUIET_TAGS[0]); ++i)
+    {
+        if (on)
+        {
             s_saved[i] = esp_log_level_get(QUIET_TAGS[i]);
             esp_log_level_set(QUIET_TAGS[i], ESP_LOG_WARN);
-        } else {
+        }
+        else
+        {
             esp_log_level_set(QUIET_TAGS[i], s_saved[i]);
         }
     }
@@ -119,16 +127,19 @@ static void quiet_logs(bool on)
 
 static esp_err_t mount_locked(bool format_if_unformatted)
 {
-    if (s_card) return ESP_OK;
+    if (s_card)
+        return ESP_OK;
     sd_pins_t p;
     load_pins(&p);
-    if (!pins_ok(&p)) return ESP_ERR_NOT_SUPPORTED;
+    if (!pins_ok(&p))
+        return ESP_ERR_NOT_SUPPORTED;
 
     quiet_logs(true);
     esp_log_level_set("spi", ESP_LOG_NONE);      /* "SPI bus already initialized" is expected */
     esp_err_t err = bus_up(&p);
     esp_log_level_set("spi", ESP_LOG_WARN);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         quiet_logs(false);
         return err;
     }
@@ -146,11 +157,13 @@ static esp_err_t mount_locked(bool format_if_unformatted)
     };
     err = esp_vfs_fat_sdspi_mount(SD_VFS, &host, &slot, &cfg, &s_card);
     quiet_logs(false);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         s_card = NULL;
         return err;
     }
-    if (mkdir(SD_PLACEHOLDER, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(SD_PLACEHOLDER, 0755) != 0 && errno != EEXIST)
+    {
         ESP_LOGW(TAG, "could not create %s: errno %d", SD_PLACEHOLDER, errno);
     }
     ESP_LOGI(TAG, "SD card %s mounted at %s", s_card->cid.name, SD_VFS);
@@ -159,7 +172,8 @@ static esp_err_t mount_locked(bool format_if_unformatted)
 
 static esp_err_t unmount_locked(void)
 {
-    if (!s_card) return ESP_OK;
+    if (!s_card)
+        return ESP_OK;
     quiet_logs(true);
     esp_err_t err = esp_vfs_fat_sdcard_unmount(SD_VFS, s_card);
     quiet_logs(false);
@@ -186,8 +200,10 @@ esp_err_t tdsh_sdcard_unmount(void)
 
 bool tdsh_sdcard_translate_logical(const char *logical, char *real_out, size_t real_out_size)
 {
-    if (!s_card || !logical || !real_out || real_out_size == 0) return false;
-    if (strncmp(logical, "/sd", 3) != 0 || (logical[3] != '\0' && logical[3] != '/')) return false;
+    if (!s_card || !logical || !real_out || real_out_size == 0)
+        return false;
+    if (strncmp(logical, "/sd", 3) != 0 || (logical[3] != '\0' && logical[3] != '/'))
+        return false;
     /* "/sd" itself is the card's root directory. */
     int n = snprintf(real_out, real_out_size, "%s%s", SD_VFS, logical[3] ? logical + 3 : "/");
     return n >= 0 && (size_t)n < real_out_size;
@@ -195,24 +211,31 @@ bool tdsh_sdcard_translate_logical(const char *logical, char *real_out, size_t r
 
 esp_err_t tdsh_sdcard_init(void)
 {
-    if (!s_lock) s_lock = xSemaphoreCreateMutex();
+    if (!s_lock)
+        s_lock = xSemaphoreCreateMutex();
     /* A card left mounted by an earlier boot leaves its placeholder. */
     (void)rmdir(SD_PLACEHOLDER);
-    if (tdsh_board_int("sd.automount", 0) != 1) return ESP_OK;
-    if (!tdsh_sdcard_configured()) {
+    if (tdsh_board_int("sd.automount", 0) != 1)
+        return ESP_OK;
+    if (!tdsh_sdcard_configured())
+    {
         ESP_LOGW(TAG, "sd.automount is set, but the SD pins are not configured");
         return ESP_ERR_NOT_SUPPORTED;
     }
     esp_err_t err = tdsh_sdcard_mount();
-    if (err != ESP_OK) ESP_LOGW(TAG, "SD card not mounted at boot: %s", esp_err_to_name(err));
+    if (err != ESP_OK)
+        ESP_LOGW(TAG, "SD card not mounted at boot: %s", esp_err_to_name(err));
     return err;
 }
 
 static void print_size(const char *label, uint64_t bytes)
 {
-    if (bytes >= 10ULL * 1024 * 1024 * 1024) {
+    if (bytes >= 10ULL * 1024 * 1024 * 1024)
+    {
         printf("%s%llu GB\n", label, (unsigned long long)(bytes / (1024ULL * 1024 * 1024)));
-    } else {
+    }
+    else
+    {
         printf("%s%llu MB\n", label, (unsigned long long)(bytes / (1024ULL * 1024)));
     }
 }
@@ -221,7 +244,8 @@ static int cmd_status(void)
 {
     sd_pins_t p;
     load_pins(&p);
-    if (!pins_ok(&p)) {
+    if (!pins_ok(&p))
+    {
         printf("SD card: not configured (board keys sd.cs, and sd.miso/mosi/sclk or eth.*)\n");
         return 1;
     }
@@ -229,13 +253,15 @@ static int cmd_status(void)
     printf("Pins:      SPI%d MISO %d MOSI %d SCLK %d CS %d, %d kHz\n",
            p.host + 1, p.miso, p.mosi, p.sclk, p.cs, SD_MAX_KHZ);
     printf("At boot:   %s\n", tdsh_board_int("sd.automount", 0) == 1 ? "mounted (sd.automount = 1)"
-                                                                    : "not mounted (board set sd.automount 1)");
-    if (!s_card) return 0;
+                                                                     : "not mounted (board set sd.automount 1)");
+    if (!s_card)
+        return 0;
     printf("Card:      %s, %s\n", s_card->cid.name,
            (s_card->ocr & (1u << 30)) ? "SDHC/SDXC" : "SDSC");
     print_size("Size:      ", (uint64_t)s_card->csd.capacity * s_card->csd.sector_size);
     uint64_t total = 0, free_bytes = 0;
-    if (esp_vfs_fat_info(SD_VFS, &total, &free_bytes) == ESP_OK) {
+    if (esp_vfs_fat_info(SD_VFS, &total, &free_bytes) == ESP_OK)
+    {
         print_size("Free:      ", free_bytes);
     }
     return 0;
@@ -246,19 +272,24 @@ int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv)
     (void)session;
     const char *sub = argc >= 2 ? argv[1] : "status";
 
-    if (strcmp(sub, "status") == 0 && argc <= 2) return cmd_status();
+    if (strcmp(sub, "status") == 0 && argc <= 2)
+        return cmd_status();
 
-    if (strcmp(sub, "mount") == 0 && argc == 2) {
-        if (!tdsh_sdcard_configured()) {
+    if (strcmp(sub, "mount") == 0 && argc == 2)
+    {
+        if (!tdsh_sdcard_configured())
+        {
             printf("sd: the SD pins are not configured (board keys sd.cs, and sd.miso/mosi/sclk or eth.*)\n");
             return 1;
         }
-        if (s_card) {
+        if (s_card)
+        {
             printf("The SD card is already mounted at /sd.\n");
             return 0;
         }
         esp_err_t err = tdsh_sdcard_mount();
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             printf("sd: cannot mount the card: %s\n", esp_err_to_name(err));
             printf("    Is a FAT-formatted card inserted? (sd format --yes erases and formats it)\n");
             return 1;
@@ -267,13 +298,16 @@ int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv)
         return 0;
     }
 
-    if ((strcmp(sub, "umount") == 0 || strcmp(sub, "unmount") == 0) && argc == 2) {
-        if (!s_card) {
+    if ((strcmp(sub, "umount") == 0 || strcmp(sub, "unmount") == 0) && argc == 2)
+    {
+        if (!s_card)
+        {
             printf("The SD card is not mounted.\n");
             return 0;
         }
         esp_err_t err = tdsh_sdcard_unmount();
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             printf("sd: unmount: %s\n", esp_err_to_name(err));
             return 1;
         }
@@ -281,21 +315,26 @@ int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv)
         return 0;
     }
 
-    if (strcmp(sub, "format") == 0) {
-        if (argc != 3 || strcmp(argv[2], "--yes") != 0) {
+    if (strcmp(sub, "format") == 0)
+    {
+        if (argc != 3 || strcmp(argv[2], "--yes") != 0)
+        {
             printf("sd format erases everything on the card and makes a new FAT file system.\n");
             printf("Run it as: sd format --yes\n");
             return 2;
         }
-        if (!tdsh_sdcard_configured()) {
+        if (!tdsh_sdcard_configured())
+        {
             printf("sd: the SD pins are not configured\n");
             return 1;
         }
         lock();
         esp_err_t err = mount_locked(true);         /* an unformatted card is formatted here */
-        if (err == ESP_OK) err = esp_vfs_fat_sdcard_format(SD_VFS, s_card);
+        if (err == ESP_OK)
+            err = esp_vfs_fat_sdcard_format(SD_VFS, s_card);
         unlock();
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             printf("sd: format failed: %s\n", esp_err_to_name(err));
             return 1;
         }

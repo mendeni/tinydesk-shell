@@ -6,25 +6,27 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef int (*tdsh_worker_fn_t)(void *arg);
-typedef void (*tdsh_worker_cleanup_fn_t)(void *arg);
+    typedef int (*tdsh_worker_fn_t)(void *arg);
+    typedef void (*tdsh_worker_cleanup_fn_t)(void *arg);
 
-typedef struct tdsh_platform_api {
-    const char *name;
-    void *context;
+    typedef struct tdsh_platform_api
+    {
+        const char *name;
+        void *context;
 
-    uint64_t (*monotonic_ms)(void *context);
-    void (*sleep_ms)(void *context, uint32_t ms);
-    void (*yield)(void *context);
-    int (*random_bytes)(void *context, void *buffer, size_t length);
+        uint64_t (*monotonic_ms)(void *context);
+        void (*sleep_ms)(void *context, uint32_t ms);
+        void (*yield)(void *context);
+        int (*random_bytes)(void *context, void *buffer, size_t length);
 
-    void *(*malloc_fn)(void *context, size_t size);
-    void *(*calloc_fn)(void *context, size_t count, size_t size);
-    void *(*realloc_fn)(void *context, void *ptr, size_t size);
-    void (*free_fn)(void *context, void *ptr);
+        void *(*malloc_fn)(void *context, size_t size);
+        void *(*calloc_fn)(void *context, size_t count, size_t size);
+        void *(*realloc_fn)(void *context, void *ptr, size_t size);
+        void (*free_fn)(void *context, void *ptr);
 
     /*
      * Execute worker(arg) using a platform-owned thread/task wrapper.
@@ -38,16 +40,16 @@ typedef struct tdsh_platform_api {
      * - On non-zero return, ownership remains with the caller and cleanup MUST NOT
      *   be called by the platform.
      */
-    int (*worker_run)(void *context,
-                      const char *name,
-                      size_t stack_bytes,
-                      int priority,
-                      bool background,
-                      tdsh_worker_fn_t worker,
-                      void *arg,
-                      tdsh_worker_cleanup_fn_t cleanup,
-                      int *result_out);
-} tdsh_platform_api_t;
+        int (*worker_run)(void *context,
+                          const char *name,
+                          size_t stack_bytes,
+                          int priority,
+                          bool background,
+                          tdsh_worker_fn_t worker,
+                          void *arg,
+                          tdsh_worker_cleanup_fn_t cleanup,
+                          int *result_out);
+    } tdsh_platform_api_t;
 
 #ifdef __cplusplus
 }

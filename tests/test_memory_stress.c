@@ -15,7 +15,8 @@ static int assert_no_live_blocks(const char *where, size_t iteration)
 {
     tdsh_memory_stats_t st;
     tdsh_memory_get_stats(&st);
-    if (st.live_blocks != 0 || st.live_bytes != 0) {
+    if (st.live_blocks != 0 || st.live_bytes != 0)
+    {
         fprintf(stderr,
                 "FAIL: tracked leak after %s iteration %zu: blocks=%zu bytes=%zu\n",
                 where, iteration, st.live_blocks, st.live_bytes);
@@ -28,25 +29,30 @@ int main(void)
 {
     char root_template[] = "/tmp/tdsh-sdk-mem-XXXXXX";
     char *root = mkdtemp(root_template);
-    if (!root) return fail("mkdtemp", 0);
+    if (!root)
+        return fail("mkdtemp", 0);
 
     tdsh_posix_config_t cfg = TDSH_POSIX_CONFIG_DEFAULT();
     cfg.hostname = "memtest";
     cfg.default_user = "alice";
     cfg.fs_root = root;
-    if (tdsh_posix_init(&cfg) != 0) return fail("posix init", 0);
+    if (tdsh_posix_init(&cfg) != 0)
+        return fail("posix init", 0);
 
     tdsh_session_t session;
-    if (tdsh_session_init(&session, "alice", false) != 0) {
+    if (tdsh_session_init(&session, "alice", false) != 0)
+    {
         return fail("session init", 0);
     }
 
     char real[TDSH_MAX_REAL_PATH];
-    if (tdsh_path_to_real(&session, "~/stress.tdsh", real, sizeof(real), NULL, 0) != 0) {
+    if (tdsh_path_to_real(&session, "~/stress.tdsh", real, sizeof(real), NULL, 0) != 0)
+    {
         return fail("script path", 0);
     }
     FILE *f = fopen(real, "w");
-    if (!f) return fail("script create", 0);
+    if (!f)
+        return fail("script create", 0);
     fputs("A=7\n", f);
     fputs("B=5\n", f);
     fputs("C=$((A + B * 2))\n", f);
@@ -59,50 +65,65 @@ int main(void)
     fclose(f);
 
     /* Stress parser capture/realloc/free paths without leaving tracked blocks. */
-    for (size_t i = 1; i <= 2000; ++i) {
-        if (tdsh_execute_line(&session, "TMP=$(echo hello | cat)") != 0) {
+    for (size_t i = 1; i <= 2000; ++i)
+    {
+        if (tdsh_execute_line(&session, "TMP=$(echo hello | cat)") != 0)
+        {
             return fail("command substitution", i);
         }
-        if (strcmp(tdsh_var_get(&session, "TMP"), "hello") != 0) {
+        if (strcmp(tdsh_var_get(&session, "TMP"), "hello") != 0)
+        {
             return fail("command substitution result", i);
         }
-        if (assert_no_live_blocks("substitution", i)) return 1;
+        if (assert_no_live_blocks("substitution", i))
+            return 1;
     }
 
     /* Stress the script runtime's dynamic line table and per-line strings. */
-    for (size_t i = 1; i <= 1000; ++i) {
-        if (tdsh_run_script_in_session(&session, "~/stress.tdsh") != 0) {
+    for (size_t i = 1; i <= 1000; ++i)
+    {
+        if (tdsh_run_script_in_session(&session, "~/stress.tdsh") != 0)
+        {
             return fail("in-session script", i);
         }
-        if (assert_no_live_blocks("in-session script", i)) return 1;
+        if (assert_no_live_blocks("in-session script", i))
+            return 1;
     }
 
     /* Stress isolated session + platform worker ownership/cleanup. */
-    for (size_t i = 1; i <= 500; ++i) {
-        if (tdsh_run_script(&session, "~/stress.tdsh", false) != 0) {
+    for (size_t i = 1; i <= 500; ++i)
+    {
+        if (tdsh_run_script(&session, "~/stress.tdsh", false) != 0)
+        {
             return fail("isolated foreground script", i);
         }
-        if (assert_no_live_blocks("isolated foreground script", i)) return 1;
+        if (assert_no_live_blocks("isolated foreground script", i))
+            return 1;
     }
 
     /* Detached worker cleanup is a separate lifecycle. Run one at a time so
      * the shell's stdio-capture implementation is not deliberately exercised
      * concurrently by this ownership test. */
-    for (size_t i = 1; i <= 100; ++i) {
-        if (tdsh_run_script(&session, "~/stress.tdsh", true) != 0) {
+    for (size_t i = 1; i <= 100; ++i)
+    {
+        if (tdsh_run_script(&session, "~/stress.tdsh", true) != 0)
+        {
             return fail("isolated background script start", i);
         }
         bool cleaned = false;
-        for (size_t wait = 0; wait < 2000; ++wait) {
+        for (size_t wait = 0; wait < 2000; ++wait)
+        {
             tdsh_memory_stats_t now;
             tdsh_memory_get_stats(&now);
-            if (now.live_blocks == 0 && now.live_bytes == 0) {
+            if (now.live_blocks == 0 && now.live_bytes == 0)
+            {
                 cleaned = true;
                 break;
             }
             tdsh_sleep_ms(1);
         }
-        if (!cleaned) return fail("background cleanup timeout", i);
+        if (!cleaned)
+            return fail("background cleanup timeout", i);
         /* Let the detached wrapper complete its final non-tracked context free. */
         tdsh_sleep_ms(1);
     }

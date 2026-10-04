@@ -10,7 +10,8 @@ static const char *TAG = "tdsh-fs";
 
 static void mkdir_if_missing(const char *path)
 {
-    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(path, 0755) != 0 && errno != EEXIST)
+    {
         ESP_LOGW(TAG, "mkdir(%s) failed: errno=%d", path, errno);
     }
 }
@@ -25,7 +26,8 @@ esp_err_t tdsh_fs_init(bool format_if_mount_failed)
     };
 
     esp_err_t err = esp_vfs_littlefs_register(&conf);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+    {
         ESP_LOGE(TAG, "LittleFS mount failed: %s", esp_err_to_name(err));
         return err;
     }
@@ -43,10 +45,13 @@ void tdsh_fs_print_info(void)
 {
     size_t total = 0, used = 0;
     esp_err_t err = esp_littlefs_info(TDSH_PARTITION_LABEL, &total, &used);
-    if (err == ESP_OK) {
+    if (err == ESP_OK)
+    {
         ESP_LOGI(TAG, "LittleFS: total=%u bytes, used=%u bytes",
                  (unsigned)total, (unsigned)used);
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "esp_littlefs_info failed: %s", esp_err_to_name(err));
     }
 }

@@ -10,13 +10,20 @@ static const char *TAG = "embed-example";
 
 /* Replace these with your real product services. The important point is that
  * commands call application APIs; TinyDesk Shell does not duplicate machine logic. */
-static bool machine_is_running(void) { return false; }
-static float machine_power_kw(void) { return 0.0f; }
+static bool machine_is_running(void)
+{
+    return false;
+}
+static float machine_power_kw(void)
+{
+    return 0.0f;
+}
 
 static int cmd_machine(tdsh_session_t *session, int argc, char **argv)
 {
     (void)session;
-    if (argc == 2 && strcmp(argv[1], "status") == 0) {
+    if (argc == 2 && strcmp(argv[1], "status") == 0)
+    {
         printf("state: %s\n", machine_is_running() ? "running" : "stopped");
         printf("power: %.1f kW\n", (double)machine_power_kw());
         return 0;
@@ -40,7 +47,8 @@ void app_main(void)
     /* In a real product firmware these are normally already done by the product
      * startup sequence. Do them only once. */
     esp_err_t err = nvs_flash_init();
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         /* Do not erase production NVS automatically. Let the product's
          * existing migration/recovery policy decide what to do. */
         ESP_LOGE(TAG, "NVS initialization requires product recovery/migration: %s",
@@ -62,8 +70,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(tdsh_espidf_init(&shell_cfg));
     int rc = tdsh_register_commands(s_app_commands,
-                                      sizeof(s_app_commands) / sizeof(s_app_commands[0]));
-    if (rc != 0) {
+                                    sizeof(s_app_commands) / sizeof(s_app_commands[0]));
+    if (rc != 0)
+    {
         ESP_LOGE(TAG, "product command registration failed: %d", rc);
         return;
     }

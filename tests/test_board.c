@@ -9,15 +9,18 @@
 
 static int failures;
 
-#define CHECK(cond, what)                                                   \
-    do {                                                                    \
-        if (!(cond)) {                                                      \
-            printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, what);           \
-            failures++;                                                     \
-        }                                                                   \
+#define CHECK(cond, what)                                         \
+    do                                                            \
+    {                                                             \
+        if (!(cond))                                              \
+        {                                                         \
+            printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, what); \
+            failures++;                                           \
+        }                                                         \
     } while (0)
 
-typedef struct {
+typedef struct
+{
     int n;
     char keys[8][TDSH_BOARD_KEY_MAX];
     char values[8][TDSH_BOARD_VALUE_MAX];
@@ -27,7 +30,8 @@ static void collect(const char *key, const char *value, int line, void *user)
 {
     (void)line;
     seen_t *s = user;
-    if (s->n < 8) {
+    if (s->n < 8)
+    {
         snprintf(s->keys[s->n], sizeof(s->keys[0]), "%s", key);
         snprintf(s->values[s->n], sizeof(s->values[0]), "%s", value);
         s->n++;
@@ -45,7 +49,8 @@ static char *read_all(const char *path)
 {
     static char buf[4096];
     FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
+    if (!f)
+        return NULL;
     size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     fclose(f);
     buf[n] = '\0';
@@ -55,15 +60,15 @@ static char *read_all(const char *path)
 int main(void)
 {
     /* Parsing: comments, spaces, CRLF, an unset, a bad line. */
-    seen_t s = { 0 };
+    seen_t s = {0};
     int bad = tdsh_board_parse("# header\n"
-                                 "  rs485.1.tx = 16   # trailing comment\r\n"
-                                 "\n"
-                                 "eth.chip=w6100\n"
-                                 "not a setting\n"
-                                 "Bad.Key = 1\n"
-                                 "sd.cs =\n",
-                                 collect, &s);
+                               "  rs485.1.tx = 16   # trailing comment\r\n"
+                               "\n"
+                               "eth.chip=w6100\n"
+                               "not a setting\n"
+                               "Bad.Key = 1\n"
+                               "sd.cs =\n",
+                               collect, &s);
     CHECK(bad == 5, "first bad line is reported");
     CHECK(s.n == 3, "three settings");
     CHECK(!strcmp(s.keys[0], "rs485.1.tx") && !strcmp(s.values[0], "16"), "spaces and comments trimmed");
