@@ -403,10 +403,13 @@ static void complete_path(tdsh_session_t *session,
     {
         if (!path_entry_matches(entry, base, base_len))
             continue;
+        const size_t name_len = strlen(entry->d_name);
+        if (name_len >= sizeof(first_name))
+            continue; /* too long for a tdsh path; cannot be completed */
         if (count == 0U)
         {
-            snprintf(first_name, sizeof(first_name), "%s", entry->d_name);
-            common = strlen(first_name);
+            memcpy(first_name, entry->d_name, name_len + 1);
+            common = name_len;
             first_is_dir = path_entry_is_dir(real, entry->d_name);
         }
         else
