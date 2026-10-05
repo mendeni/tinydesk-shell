@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.4 (2026-10-05)
 
 * **`board save`** copies every setting that comes only from the firmware's
   built-in configuration into `/etc/board.conf` (the file's own lines and

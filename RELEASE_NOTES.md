@@ -7,18 +7,31 @@ also runs on a PC. It is the shell inside
 This release is a developer preview: expect rough edges, and please report
 what breaks.
 
-## New in 0.1.3
+## New in 0.1.4
 
-* **nano fits the terminal:** it asks the terminal for its size, so its
-  status line (Ctrl+C shows the cursor position there) and help lines are
-  no longer cut off in a terminal smaller than 80x24. On the boards and in
-  the Linux program.
-* **The factory password is named:** while root still has it, `passwd`
-  says the old password is `TinyDesk` (capital T and D), and `ssh start`
-  and `ftp start` say so when they refuse to start.
+* **Long command lines:** a line longer than the terminal is wide wraps
+  over several rows and stays editable: typing, Backspace, Delete, the
+  arrows, Home/End and history redraw every row. Before, text was left
+  behind or doubled and the cursor could not move back across the wrap.
+  The shell learns the width from the terminal (asked once per line on a
+  serial console), the SSH client, the Windows console or the Linux
+  terminal; UTF-8 characters count as one column each.
+* **`board save`** copies the pins built into the firmware into
+  `/etc/board.conf`, so firmware built without them, such as an official
+  release, keeps them. `board show` says when that is needed.
+* **Tab completion** skips names too long for a shell path.
+* **For contributors:** `CONTRIBUTING.md`, and a pre-commit hook that
+  formats C files with clang-format 16 (`pip install pre-commit`, then
+  `pre-commit install`). The sources are now formatted with it.
+* **For programs that embed the shell:** `tdsh_terminal_io_t` has two
+  new optional members, `columns()` and `read_byte_timeout()`; code that
+  fills the struct by position must name them (designated initializers
+  are fine).
 
-Also since 0.1.0: the SD card at `/sd` (`sd mount`, 0.1.2), `ping -c`, and
-`tdsh.exe`, a native Windows program (`tinydesk-shell-windows-x64.zip`).
+Also since 0.1.0: nano follows the terminal's size and the factory
+password is named where it is needed (0.1.3), the SD card at `/sd`
+(`sd mount`, 0.1.2), `ping -c`, and `tdsh.exe`, a native Windows program
+(`tinydesk-shell-windows-x64.zip`).
 
 ## Install
 
