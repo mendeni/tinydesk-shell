@@ -77,6 +77,17 @@ const char *tdsh_board_file(void);
  * restart. Returns 0 or a negative errno. */
 int tdsh_board_set(const char *key, const char *value);
 
+/* Settings that come only from the configuration built into the firmware.
+ * Firmware built without them (an official release) would lose them, so
+ * save them in the device file before installing it. */
+int tdsh_board_unsaved(void);
+
+/* Write every setting that comes from the built-in configuration into the
+ * device file (with tdsh_board_set(): the file's comments and other lines
+ * stay, settings the file changes or removes stay as the file has them).
+ * Returns how many were written, or a negative errno. */
+int tdsh_board_save_builtin(void);
+
 #ifdef __cplusplus
 }
 #endif

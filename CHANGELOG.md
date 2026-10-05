@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+* **`board save`** copies every setting that comes only from the firmware's
+  built-in configuration into `/etc/board.conf` (the file's own lines and
+  comments stay), so firmware built without them, such as an official
+  release, keeps the board's pins. `board show` says when there are such
+  settings. New `tdsh_board_unsaved()` and `tdsh_board_save_builtin()`.
+* **Tab completion** skips directory entries whose names are too long for a
+  shell path instead of copying them cut short (and the compiler no longer
+  warns about it on Windows).
 * **Long command lines:** a line longer than the terminal is wide wraps
   over several rows, and typing, Backspace, Delete, the arrows, Home/End
   and history redraw it correctly; before, the earlier rows were never

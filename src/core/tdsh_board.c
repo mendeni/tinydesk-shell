@@ -349,3 +349,37 @@ int tdsh_board_set(const char *key, const char *value)
     (void)tdsh_board_load(s_builtin, file);
     return 0;
 }
+
+int tdsh_board_unsaved(void)
+{
+    int n = 0;
+    for (int i = 0; i < s_count; i++)
+        if (s_entries[i].origin == TDSH_BOARD_BUILTIN)
+            n++;
+    return n;
+}
+
+int tdsh_board_save_builtin(void)
+{
+    /* One key at a time through tdsh_board_set(), which keeps the file's
+     * comments and other lines; it reloads the table, so look again each
+     * time. Every round moves one key to the file, so at most the number
+     * of keys rounds. */
+    int saved = 0;
+    for (int round = tdsh_board_count(); round >= 0; round--)
+    {
+        int i = 0;
+        while (i < s_count && s_entries[i].origin != TDSH_BOARD_BUILTIN)
+            i++;
+        if (i == s_count)
+            return saved;
+        char key[TDSH_BOARD_KEY_MAX], value[TDSH_BOARD_VALUE_MAX];
+        snprintf(key, sizeof(key), "%s", s_entries[i].key);
+        snprintf(value, sizeof(value), "%s", s_entries[i].value);
+        int rc = tdsh_board_set(key, value);
+        if (rc != 0)
+            return rc;
+        saved++;
+    }
+    return -EIO;
+}

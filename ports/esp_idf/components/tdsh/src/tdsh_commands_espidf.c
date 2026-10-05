@@ -153,6 +153,8 @@ static void board_usage(void)
            "  board set <key> <value> (root) write it to /etc/board.conf\n"
            "  board unset <key>       (root) remove it from /etc/board.conf\n"
            "  board init              (root) start /etc/board.conf from the built-in settings\n"
+           "  board save              (root) copy the built-in settings into /etc/board.conf,\n"
+           "                          so firmware without them (an official update) keeps them\n"
            "Settings are read at start-up: restart after a change.\n");
 }
 
@@ -173,6 +175,12 @@ static int cmd_board(tdsh_session_t *session, int argc, char **argv)
         }
         if (!n)
             printf("  (nothing configured: see `board set` and board.example.conf)\n");
+        int unsaved = tdsh_board_unsaved();
+        if (unsaved)
+            printf("%d built-in setting%s: firmware built without %s (an official update) would\n"
+                   "lose %s. `board save` copies %s into /etc/board.conf.\n",
+                   unsaved, unsaved == 1 ? "" : "s", unsaved == 1 ? "it" : "them",
+                   unsaved == 1 ? "it" : "them", unsaved == 1 ? "it" : "them");
         return 0;
     }
     if (!strcmp(op, "get") && argc == 3)
@@ -186,12 +194,27 @@ static int cmd_board(tdsh_session_t *session, int argc, char **argv)
         printf("%s = %s (%s)\n", argv[2], v, origin_name(tdsh_board_origin(argv[2])));
         return 0;
     }
-    if ((!strcmp(op, "set") && argc == 4) || (!strcmp(op, "unset") && argc == 3) || (!strcmp(op, "init") && argc == 2))
+    if ((!strcmp(op, "set") && argc == 4) || (!strcmp(op, "unset") && argc == 3) ||
+        (!strcmp(op, "init") && argc == 2) || (!strcmp(op, "save") && argc == 2))
     {
         if (!root)
         {
             printf("board: permission denied: root required\n");
             return 1;
+        }
+        if (!strcmp(op, "save"))
+        {
+            int saved = tdsh_board_save_builtin();
+            if (saved < 0)
+            {
+                printf("board: cannot write /etc/board.conf: %s\n", strerror(-saved));
+                return 1;
+            }
+            if (saved == 0)
+                printf("Nothing to save: no setting comes only from the firmware.\n");
+            else
+                printf("Saved %d built-in setting%s in /etc/board.conf.\n", saved, saved == 1 ? "" : "s");
+            return 0;
         }
         if (!strcmp(op, "init"))
         {
@@ -232,7 +255,7 @@ static int cmd_board(tdsh_session_t *session, int argc, char **argv)
 }
 
 static const tdsh_command_t s_base_commands[] = {
-    {"board", "board [show|get|set|unset|init] ...", "Show or change the board configuration (pins)", cmd_board, 0},
+    {"board", "board [show|get|set|unset|init|save] ...", "Show or change the board configuration (pins)", cmd_board, 0},
     {"users", "users", "List users", tdsh_cmd_users, 0},
     {"useradd", "useradd <username>", "Create a user", tdsh_cmd_useradd, TDSH_CMD_ROOT_ONLY},
     {"userdel", "userdel <username> [-f]", "Delete a user", tdsh_cmd_userdel, TDSH_CMD_ROOT_ONLY},

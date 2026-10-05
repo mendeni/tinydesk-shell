@@ -111,6 +111,27 @@ int main(void)
     CHECK(tdsh_board_set("Bad Key", "1") != 0, "bad key refused");
     CHECK(tdsh_board_set("ok.key", "a # b") != 0, "value with # refused");
 
+    /* Saving the built-in settings: the two that come only from the
+     * firmware go into the file; the file's own (and its unset "flag")
+     * stay as they are, and nothing changes value. */
+    CHECK(tdsh_board_unsaved() == 2, "two settings only built in");
+    CHECK(tdsh_board_save_builtin() == 2, "two saved");
+    CHECK(tdsh_board_unsaved() == 0, "none left");
+    CHECK(tdsh_board_origin("rs485.1.uart") == TDSH_BOARD_FILE && tdsh_board_int("rs485.1.uart", -1) == 1, "uart saved");
+    CHECK(tdsh_board_origin("rs485.1.tx") == TDSH_BOARD_FILE && tdsh_board_int("rs485.1.tx", -1) == 16, "tx saved");
+    CHECK(tdsh_board_get("flag") == NULL, "a key the file unsets stays unset");
+    CHECK(!strcmp(tdsh_board_get("eth.chip"), "w6100") && tdsh_board_int("sd.cs", -1) == 22, "file values kept");
+    text = read_all(path); /* a static buffer */
+    CHECK(text && strstr(text, "# my board\n") == text, "comment kept on save");
+    CHECK(text && strstr(text, "rs485.1.uart = 1\n") && strstr(text, "rs485.1.tx = 16\n"), "written to the file");
+    CHECK(tdsh_board_save_builtin() == 0, "saving again writes nothing");
+    /* What the file now holds survives without the built-in text (a
+     * firmware built without it). */
+    CHECK(tdsh_board_load(NULL, path) == 0 && tdsh_board_int("rs485.1.uart", -1) == 1 &&
+              tdsh_board_int("rs485.1.tx", -1) == 16 && tdsh_board_get("flag") == NULL,
+          "settings kept without the built-in text");
+    CHECK(tdsh_board_load(builtin, path) == 0, "reload with the built-in text");
+
     /* No device file at all. */
     remove(path);
     CHECK(tdsh_board_load(builtin, path) == 0, "missing file is fine");
