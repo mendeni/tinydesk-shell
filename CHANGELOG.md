@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (2026-10-06)
 
 * **STANDARDS.md** sets out the names, code style, commands, board keys,
   device paths and release rules, also for community ports.

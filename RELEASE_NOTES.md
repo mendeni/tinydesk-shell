@@ -7,31 +7,24 @@ also runs on a PC. It is the shell inside
 This release is a developer preview: expect rough edges, and please report
 what breaks.
 
-## New in 0.1.4
+## New in 0.1.5
 
-* **Long command lines:** a line longer than the terminal is wide wraps
-  over several rows and stays editable: typing, Backspace, Delete, the
-  arrows, Home/End and history redraw every row. Before, text was left
-  behind or doubled and the cursor could not move back across the wrap.
-  The shell learns the width from the terminal (asked once per line on a
-  serial console), the SSH client, the Windows console or the Linux
-  terminal; UTF-8 characters count as one column each.
-* **`board save`** copies the pins built into the firmware into
-  `/etc/board.conf`, so firmware built without them, such as an official
-  release, keeps them. `board show` says when that is needed.
-* **Tab completion** skips names too long for a shell path.
-* **For contributors:** `CONTRIBUTING.md`, and a pre-commit hook that
-  formats C files with clang-format 16 (`pip install pre-commit`, then
-  `pre-commit install`). The sources are now formatted with it.
-* **For programs that embed the shell:** `tdsh_terminal_io_t` has two
-  new optional members, `columns()` and `read_byte_timeout()`; code that
-  fills the struct by position must name them (designated initializers
-  are fine).
+* **Only root changes the network policy:** `network mode` and
+  `network autowifi` with a value need root; any user still sees them.
+  Before, any user could switch Wi-Fi or the LAN off for the whole board,
+  or make it connect at boot.
+* **Board configuration numbers** are decimal or `0x` hexadecimal, as
+  documented: a leading zero no longer means octal (`08` was rejected,
+  `010` read as 8).
+* **New home:** the code is at github.com/tinydesk-project and the
+  documentation at <https://tinydesk-project.github.io/>.
+  `STANDARDS.md` sets out names, code style, commands, board keys and
+  release rules, also for community ports.
 
-Also since 0.1.0: nano follows the terminal's size and the factory
-password is named where it is needed (0.1.3), the SD card at `/sd`
-(`sd mount`, 0.1.2), `ping -c`, and `tdsh.exe`, a native Windows program
-(`tinydesk-shell-windows-x64.zip`).
+Also since 0.1.0: long command lines wrap and stay editable, and
+`board save` keeps built-in pins (0.1.4); nano follows the terminal's
+size (0.1.3); the SD card at `/sd` (`sd mount`, 0.1.2); `ping -c`, and
+`tdsh.exe`, a native Windows program (`tinydesk-shell-windows-x64.zip`).
 
 ## Install
 
