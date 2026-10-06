@@ -188,11 +188,13 @@ condition form, the limits and a tested example: `docs/SCRIPTING.md`.
 
 ## Community ports
 
-Maintained by their authors, not built or tested here:
+Maintained by their authors, not built or tested here. Each port has its
+own prefix for its names, commands and board keys
+([STANDARDS.md](STANDARDS.md#port-prefix)):
 
-| Port | Platform | Notes |
-| --- | --- | --- |
-| [TinyTang](https://github.com/aquasock/TinyTang) by [@aquasock](https://github.com/aquasock) | BL616 (FreeRTOS), Sipeed Tang Console 138K | Shell over USB CDC with the SD card as filesystem; adds commands to load FPGA cores and ROMs, mirror the session to the core's on-screen display, and self-update the firmware |
+| Port | Platform | Prefix | Notes |
+| --- | --- | --- | --- |
+| [TinyTang](https://github.com/aquasock/TinyTang) by [@aquasock](https://github.com/aquasock) | BL616 (FreeRTOS), Sipeed Tang Console 138K | not chosen yet | Shell over USB CDC with the SD card as filesystem; adds commands to load FPGA cores and ROMs, mirror the session to the core's on-screen display, and self-update the firmware |
 
 ## Documentation
 

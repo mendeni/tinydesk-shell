@@ -26,8 +26,12 @@ reporting a problem.
    request, so the documentation and the changelog can follow.
 5. Keep board-specific pins out of the code; use board configuration keys.
 
+Names, code style, commands, board keys and release files follow
+[STANDARDS.md](STANDARDS.md).
+
 New platform ports go in `ports/<platform>/`; see `ports/posix` and
-`ports/windows` for small examples. Ports for other chips are welcome.
+`ports/windows` for small examples. Ports for other chips are welcome;
+STANDARDS.md says how to name one and what its README must state.
 
 TinyDesk uses this repository as its `third_party/tdsh` submodule, so shell
 changes land here first.

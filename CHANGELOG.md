@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* **STANDARDS.md** sets out the names, code style, commands, board keys,
+  device paths and release rules, also for community ports.
 * **Board configuration numbers** are decimal or `0x` hexadecimal, as
   documented: a leading zero no longer means octal (`08` was rejected and
   `010` read as 8).
