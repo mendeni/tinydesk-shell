@@ -32,7 +32,7 @@ New platform ports go in `ports/<platform>/`; see `ports/posix` and
 TinyDesk uses this repository as its `third_party/tdsh` submodule, so shell
 changes land here first.
 
-More detail: the [contributing guide](https://schikani.github.io/tinydesk-docs/#/contributing)
+More detail: the [contributing guide](https://tinydesk-project.github.io/#/contributing)
 in the TinyDesk documentation.
 
 Security problems: report them privately via GitHub (Security → Report a

@@ -2,7 +2,7 @@
 
 **A Unix-like shell for microcontrollers, with users, networking and SSH,
 that also runs on a PC.** TinyDesk Shell (`tdsh`) is the
-shell inside [TinyDesk](https://github.com/schikani/tinydesk), the
+shell inside [TinyDesk](https://github.com/tinydesk-project/tinydesk), the
 terminal desktop for microcontrollers, and works on its own too.
 
 ![TinyDesk Shell on an ESP32 serial console](docs/images/terminal.png)
@@ -32,10 +32,10 @@ The C API uses the prefix `tdsh_` (`tdsh.h`, `tdsh_espidf.h`); scripts end in `.
 
 This is a developer preview.
 
-* **From the browser:** the [TinyDesk web installer](https://schikani.github.io/tinydesk-docs/install/#shell/esp32c6)
+* **From the browser:** the [TinyDesk web installer](https://tinydesk-project.github.io/install/#shell/esp32c6)
   flashes TinyDesk Shell onto an ESP32-C6 or ESP32 (Chrome or Edge), and the
-  [web terminal](https://schikani.github.io/tinydesk-docs/console/) opens the board afterwards.
-* **Files:** every [release](https://github.com/schikani/tinydesk-shell/releases) has a factory image
+  [web terminal](https://tinydesk-project.github.io/console/) opens the board afterwards.
+* **Files:** every [release](https://github.com/tinydesk-project/tinydesk-shell/releases) has a factory image
   per board (flash at offset 0 with esptool), the Linux program, the Windows
   program (`tdsh.exe`, run it in Windows Terminal) and `SHA256SUMS.txt`. On a
   PC the shell keeps its files apart from yours: in
@@ -51,7 +51,7 @@ them; it runs locally too).
 ## Get the source
 
 ```bash
-git clone https://github.com/schikani/tinydesk-shell.git
+git clone https://github.com/tinydesk-project/tinydesk-shell.git
 cd tinydesk-shell
 ```
 

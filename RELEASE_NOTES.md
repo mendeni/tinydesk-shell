@@ -2,7 +2,7 @@
 
 A Unix-like shell for microcontrollers, with users, networking and SSH, that
 also runs on a PC. It is the shell inside
-[TinyDesk](https://github.com/schikani/tinydesk) and works on its own too.
+[TinyDesk](https://github.com/tinydesk-project/tinydesk) and works on its own too.
 
 This release is a developer preview: expect rough edges, and please report
 what breaks.
@@ -35,7 +35,7 @@ password is named where it is needed (0.1.3), the SD card at `/sd`
 
 ## Install
 
-* **ESP boards, from the browser:** <https://schikani.github.io/tinydesk-docs/install/#shell/esp32c6>
+* **ESP boards, from the browser:** <https://tinydesk-project.github.io/install/#shell/esp32c6>
   (Chrome or Edge on a computer). Choose *TinyDesk Shell* and your board.
 * **Without the browser:** flash a `*-factory.bin` below at offset 0:
 
@@ -61,7 +61,7 @@ factory image erases users, Wi-Fi networks and the SSH host key.
 
 Open the board's serial port in a UTF-8 terminal (115200 baud on the
 ESP32, any speed on the ESP32-C6's USB port), or the web terminal at
-<https://schikani.github.io/tinydesk-docs/console/>. You start as root:
+<https://tinydesk-project.github.io/console/>. You start as root:
 run `passwd` locally (initial password: `TinyDesk`) before enabling remote
 access. `help` lists the commands; `.tdsh` scripts are described in
 `docs/SCRIPTING.md`.
