@@ -214,7 +214,7 @@ int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv);
 | wifiadd | wifiadd <ssid> [password] | Save a Wi-Fi network in NVS |
 | wifiremove | wifiremove <ssid ...> | Remove saved Wi-Fi networks |
 | lan | lan <status\|config\|enable\|disable\|dhcp\|static\|dns\|hw\|poll> ... | Configure W6100 Ethernet |
-| network | network [status] \| network mode [auto\|lan\|wifi\|both] \| network autowifi [on\|off] | Configure network policy |
+| network | network [status] \| network mode [auto\|lan\|wifi\|both] \| network autowifi [on\|off] | Configure network policy (changing it: root) |
 | netmount | netmount <list\|add\|connect\|disconnect\|status\|remove> ... | Map SMB2/SMB3 shares |
 | ifconfig | ifconfig | Show network interfaces and default route |
 | ping | ping [-c count] <host/address ...> | Send ICMP echo requests (4 per host unless -c) |

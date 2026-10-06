@@ -7,6 +7,9 @@
 * **Board configuration numbers** are decimal or `0x` hexadecimal, as
   documented: a leading zero no longer means octal (`08` was rejected and
   `010` read as 8).
+* **`network mode`** and **`network autowifi`** with a value are root only;
+  any user still sees them. Before, any user could switch Wi-Fi or the LAN
+  off for the whole device, or make it connect at boot.
 
 ## 0.1.4 (2026-10-05)
 

@@ -490,6 +490,7 @@ cleanup:
  * PLAIN TTL UART -- ESP32-C6 LP UART
  * -------------------------------------------------------------------------- */
 
+#if CONFIG_IDF_TARGET_ESP32C6   /* only the LP UART test uses it */
 /*
  * Prepare RX for a deterministic loopback test.
  *
@@ -553,6 +554,7 @@ static int uart_prepare_clean_rx(uart_port_t port)
     (void)uart_flush_input(port);
     return discarded;
 }
+#endif
 
 static esp_err_t hwtest_uart(void)
 {

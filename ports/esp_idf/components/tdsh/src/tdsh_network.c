@@ -435,7 +435,13 @@ int tdsh_cmd_ifconfig(tdsh_session_t *session, int argc, char **argv)
 
 int tdsh_cmd_network(tdsh_session_t *session, int argc, char **argv)
 {
-    (void)session;
+    /* Both settings are the device's, not the user's: only root changes them. */
+    if (argc == 3 && (strcmp(argv[1], "mode") == 0 || strcmp(argv[1], "autowifi") == 0) &&
+        strcmp(session->username, "root") != 0)
+    {
+        printf("network: permission denied: root required\n");
+        return 1;
+    }
 
     if (argc == 1 ||
         (argc == 2 && strcmp(argv[1], "status") == 0))
