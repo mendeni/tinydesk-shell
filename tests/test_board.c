@@ -132,6 +132,15 @@ int main(void)
           "settings kept without the built-in text");
     CHECK(tdsh_board_load(builtin, path) == 0, "reload with the built-in text");
 
+    /* Numbers are decimal or 0x hex, never octal. */
+    write_file(path, "a = 08\nb = 010\nc = 0x1F\nd = -1\ne = 0X10\nf = 12abc\n");
+    CHECK(tdsh_board_load(NULL, path) == 0, "load numbers");
+    CHECK(tdsh_board_int("a", -9) == 8, "08 is 8");
+    CHECK(tdsh_board_int("b", -9) == 10, "010 is 10, not octal 8");
+    CHECK(tdsh_board_int("c", -9) == 31 && tdsh_board_int("e", -9) == 16, "0x hex");
+    CHECK(tdsh_board_int("d", 5) == -1, "-1");
+    CHECK(tdsh_board_int("f", -9) == -9, "trailing junk gives the default");
+
     /* No device file at all. */
     remove(path);
     CHECK(tdsh_board_load(builtin, path) == 0, "missing file is fine");

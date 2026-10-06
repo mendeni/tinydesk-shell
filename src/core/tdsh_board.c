@@ -219,8 +219,11 @@ int tdsh_board_int(const char *key, int def)
     const char *v = tdsh_board_get(key);
     if (!v)
         return def;
+    /* Decimal, or hexadecimal with 0x. Never octal: "08" is 8, "010" is 10. */
+    const char *digits = v + (*v == '-' || *v == '+');
+    int base = digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X') ? 16 : 10;
     char *end = NULL;
-    long n = strtol(v, &end, 0);
+    long n = strtol(v, &end, base);
     return end && end != v && *end == '\0' ? (int)n : def;
 }
 

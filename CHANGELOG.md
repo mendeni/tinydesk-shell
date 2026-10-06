@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+* **Board configuration numbers** are decimal or `0x` hexadecimal, as
+  documented: a leading zero no longer means octal (`08` was rejected and
+  `010` read as 8).
+
 ## 0.1.4 (2026-10-05)
 
 * **`board save`** copies every setting that comes only from the firmware's
