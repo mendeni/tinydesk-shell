@@ -72,6 +72,23 @@ void tdsh_memory_get_stats(tdsh_memory_stats_t *stats);
 ## include/tdsh_platform.h
 
 ```c
+#define TDSH_MEM_8        (1u << 0)
+#define TDSH_MEM_16       (1u << 1)
+#define TDSH_MEM_32       (1u << 2)
+#define TDSH_MEM_READONLY (1u << 3)
+
+typedef struct
+{
+    const char *name;
+    uintptr_t start;
+    size_t size;
+    uint32_t flags;
+} tdsh_mem_region_t;
+
+/* tdsh_platform_api_t: name, context, monotonic_ms, sleep_ms, yield,
+ * random_bytes, malloc_fn, calloc_fn, realloc_fn, free_fn, worker_run and
+ * the optional memory regions for peek and poke: */
+const tdsh_mem_region_t *(*mem_regions)(void *context, size_t *count);
 ```
 
 ## include/tdsh_terminal.h
@@ -193,6 +210,8 @@ int tdsh_cmd_sd(tdsh_session_t *session, int argc, char **argv);
 | set | set | Show shell variables |
 | unset | unset <name ...> | Remove shell variables |
 | version | version | Show TinyDesk Shell version |
+| peek | peek -l \| peek [-w 8\|16\|32] <address> [count] | Read memory the port allows (root; only on ports with `mem_regions`) |
+| poke | poke [-w 8\|16\|32] <address> <value> | Write memory the port allows (root; only on ports with `mem_regions`) |
 | users | users | List TinyDesk Shell users |
 | useradd | useradd <username> | Create a user |
 | userdel | userdel <username> [-f] | Delete a user |

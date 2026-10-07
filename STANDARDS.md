@@ -246,7 +246,10 @@ upstream command does, with the same options:
 - every command upstream ships on any platform (run `help` on the ESP32,
   POSIX and Windows builds; FUNCTIONS.md lists them);
 - the peripheral and subsystem names `gpio`, `spi`, `i2c`, `uart`, `adc`,
-  `pwm`, `usb`, `sd`, `eth`, `wifi`, `ota`.
+  `pwm`, `usb`, `sd`, `eth`, `wifi`, `ota`;
+- `peek` and `poke`: the core registers them when a port lists memory
+  regions (`mem_regions` in `tdsh_platform_api_t`, see docs/PORTING.md). A
+  port provides the regions, not commands of its own with these names.
 
 A port command whose name is generic enough that upstream might one day want
 it should carry the prefix (`tangput`, `tangflash`). If upstream later adds a

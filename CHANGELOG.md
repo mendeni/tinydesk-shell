@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+* **`peek` and `poke`** read and write memory, for RAM and peripheral
+  registers: `peek -l`, `peek [-w 8|16|32] <address> [count]`,
+  `poke [-w 8|16|32] <address> <value>`. Root only, 32-bit by default; one
+  value prints alone (`V=$(peek ...)`), a count prints a dump of 16 bytes
+  per line. Every access is checked against the regions the port lists
+  with the new optional `mem_regions` hook in `tdsh_platform_api_t`:
+  misaligned, outside or across a region's end, a width the region does
+  not allow, or a write to a read-only region is refused with exit status
+  1. Without the hook neither command is registered, so the host and
+  ESP32 builds do not have them. Requested in #1 for the TinyTang port.
 * **Ports can set the script memory limits:** `TDSH_MAX_VARS`,
   `TDSH_VAR_NAME_MAX`, `TDSH_VAR_VALUE_MAX` and `TDSH_SCRIPT_TASK_STACK`
   can be defined by the build. The defaults are unchanged: 64 variables,

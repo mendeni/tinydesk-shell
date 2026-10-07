@@ -12,6 +12,22 @@ extern "C" {
 typedef int (*tdsh_worker_fn_t)(void *arg);
 typedef void (*tdsh_worker_cleanup_fn_t)(void *arg);
 
+/* Access widths a memory region allows (at least one), and whether poke may
+ * write it. */
+#define TDSH_MEM_8        (1u << 0)
+#define TDSH_MEM_16       (1u << 1)
+#define TDSH_MEM_32       (1u << 2)
+#define TDSH_MEM_READONLY (1u << 3)
+
+/* A range of the address space that peek and poke may access. */
+typedef struct
+{
+    const char *name; /* shown by peek -l, e.g. "sram" or "gpio" */
+    uintptr_t start;
+    size_t size; /* bytes */
+    uint32_t flags; /* TDSH_MEM_8 | TDSH_MEM_16 | TDSH_MEM_32 | TDSH_MEM_READONLY */
+} tdsh_mem_region_t;
+
 typedef struct tdsh_platform_api
 {
     const char *name;
@@ -48,6 +64,17 @@ typedef struct tdsh_platform_api
                       void *arg,
                       tdsh_worker_cleanup_fn_t cleanup,
                       int *result_out);
+
+    /*
+     * Optional: the memory regions root may read with peek and write with poke.
+     * Return the table and store its length in *count.  The table must stay
+     * valid while the shell runs.  Without this hook, or with an empty table
+     * when tdsh_register_core_builtins() runs, neither command is registered.
+     * List only addresses that are safe to access: leave out registers that
+     * change state when read (clear-on-read, FIFOs) and peripherals that may be
+     * clock-gated or powered down.
+     */
+    const tdsh_mem_region_t *(*mem_regions)(void *context, size_t *count);
 } tdsh_platform_api_t;
 
 #ifdef __cplusplus

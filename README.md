@@ -171,6 +171,40 @@ For consumers with C++ sources, pass the same definitions to their C++
 compilation too. Choose the worker stack size for the target and verify
 its margin while running the intended scripts.
 
+### peek and poke
+
+On a port that lists memory regions ([docs/PORTING.md](docs/PORTING.md)),
+root can read and write them:
+
+```
+peek -l                               the regions: first and last address, widths, access
+peek [-w 8|16|32] <address>           one value, printed alone: 0x00001234
+peek [-w 8|16|32] <address> <count>   count values, 16 bytes per line
+poke [-w 8|16|32] <address> <value>   write one value
+```
+
+Accesses are 32-bit unless `-w` says otherwise. Addresses, counts and
+values are decimal or `0x` hexadecimal. A misaligned address, an access
+outside the regions or across a region's end, a width the region does not
+allow, a `poke` to a read-only region and a value too wide for the width
+are refused with exit status 1. One value prints alone, so a script can
+use it: `V=$(peek 0x2000c000)`.
+
+```
+# peek -l
+REGION           START              END                WIDTHS    ACCESS
+sram             0x62fc0000         0x62ffffff         8 16 32   read/write
+gpio             0x2000c000         0x2000c0ff         32        read/write
+# peek -w 8 0x62fc0000 20
+0x62fc0000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+0x62fc0010: 10 11 12 13
+# poke 0x2000c004 0x1
+# peek 0x2000c004
+0x00000001
+```
+
+The host and ESP32 builds list no regions, so they have neither command.
+
 ## Scripts
 
 Put commands in a `.tdsh` file and run it with `tdsh run`. The script

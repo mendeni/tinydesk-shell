@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,8 @@ static int cmd_set(tdsh_session_t *session, int argc, char **argv);
 static int cmd_unset(tdsh_session_t *session, int argc, char **argv);
 static int cmd_tdsh(tdsh_session_t *session, int argc, char **argv);
 static int cmd_version(tdsh_session_t *session, int argc, char **argv);
+static int cmd_peek(tdsh_session_t *session, int argc, char **argv);
+static int cmd_poke(tdsh_session_t *session, int argc, char **argv);
 
 static const tdsh_command_t s_core_commands[] = {
     {"help", "help [command]", "Show commands or command help", cmd_help, 0},
@@ -65,10 +68,36 @@ static const tdsh_command_t s_core_commands[] = {
     {"version", "version", "Show the TinyDesk Shell version", cmd_version, 0},
 };
 
+/* Only when the port lists memory regions (tdsh_platform_api_t mem_regions). */
+static const tdsh_command_t s_mem_commands[] = {
+    {"peek", "peek -l | peek [-w 8|16|32] <address> [count]", "Read memory the port allows", cmd_peek, TDSH_CMD_ROOT_ONLY},
+    {"poke", "poke [-w 8|16|32] <address> <value>", "Write memory the port allows", cmd_poke, TDSH_CMD_ROOT_ONLY},
+};
+
+static const tdsh_mem_region_t *mem_regions(size_t *count)
+{
+    const tdsh_core_config_t *cfg = tdsh_core_config();
+    const tdsh_platform_api_t *p = cfg ? cfg->platform : NULL;
+    const tdsh_mem_region_t *regions = NULL;
+    *count = 0;
+    if (p && p->mem_regions)
+        regions = p->mem_regions(p->context, count);
+    if (!regions)
+        *count = 0;
+    return regions;
+}
+
 int tdsh_register_core_builtins(void)
 {
-    return tdsh_register_commands(s_core_commands,
-                                  sizeof(s_core_commands) / sizeof(s_core_commands[0]));
+    int rc = tdsh_register_commands(s_core_commands,
+                                    sizeof(s_core_commands) / sizeof(s_core_commands[0]));
+    size_t regions = 0;
+    if (rc == 0 && mem_regions(&regions) && regions > 0)
+    {
+        rc = tdsh_register_commands(s_mem_commands,
+                                    sizeof(s_mem_commands) / sizeof(s_mem_commands[0]));
+    }
+    return rc;
 }
 
 static int usage(const tdsh_command_t *cmd)
@@ -996,5 +1025,213 @@ static int cmd_version(tdsh_session_t *session, int argc, char **argv)
     if (argc != 1)
         return usage(tdsh_command_find("version"));
     printf("TinyDesk Shell %s (%s)\n", TDSH_VERSION, tdsh_platform_name());
+    return 0;
+}
+
+/* peek and poke: the core checks every access against the port's regions,
+ * so a port only lists what is safe. */
+
+/* Decimal or 0x hexadecimal, as in the board configuration (never octal). */
+static bool mem_number(const char *text, uint64_t *out)
+{
+    unsigned base = 10;
+    if (text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+    {
+        base = 16;
+        text += 2;
+    }
+    if (!*text)
+        return false;
+    uint64_t value = 0;
+    for (; *text; ++text)
+    {
+        unsigned digit;
+        if (*text >= '0' && *text <= '9')
+            digit = (unsigned)(*text - '0');
+        else if (base == 16 && *text >= 'a' && *text <= 'f')
+            digit = (unsigned)(*text - 'a' + 10);
+        else if (base == 16 && *text >= 'A' && *text <= 'F')
+            digit = (unsigned)(*text - 'A' + 10);
+        else
+            return false;
+        if (value > (UINT64_MAX - digit) / base)
+            return false;
+        value = value * base + digit;
+    }
+    *out = value;
+    return true;
+}
+
+/* "-w 8|16|32" before the operands: stores the width in bytes (32-bit by
+ * default) and returns the index of the first operand, or -1. */
+static int mem_width(int argc, char **argv, unsigned *bytes)
+{
+    *bytes = 4;
+    if (argc < 2 || strcmp(argv[1], "-w") != 0)
+        return 1;
+    if (argc < 3)
+        return -1;
+    if (strcmp(argv[2], "8") == 0)
+        *bytes = 1;
+    else if (strcmp(argv[2], "16") == 0)
+        *bytes = 2;
+    else if (strcmp(argv[2], "32") != 0)
+        return -1;
+    return 3;
+}
+
+static const char *mem_name(const tdsh_mem_region_t *region)
+{
+    return region->name ? region->name : "?";
+}
+
+static uint32_t mem_width_flag(unsigned bytes)
+{
+    if (bytes == 1)
+        return TDSH_MEM_8;
+    if (bytes == 2)
+        return TDSH_MEM_16;
+    return TDSH_MEM_32;
+}
+
+/* True when [address, address + length) may be accessed at this width;
+ * otherwise prints why not. */
+static bool mem_allowed(const char *cmd, uint64_t address, uint64_t length, unsigned bytes, bool write)
+{
+    if (address % bytes != 0)
+    {
+        printf("%s: 0x%" PRIx64 " is not aligned to %u bits\n", cmd, address, bytes * 8);
+        return false;
+    }
+    size_t count;
+    const tdsh_mem_region_t *r = mem_regions(&count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        uint64_t start = r[i].start;
+        uint64_t size = r[i].size;
+        if (address < start || address - start >= size)
+            continue;
+        if (length > size - (address - start))
+        {
+            printf("%s: %" PRIu64 " bytes from 0x%" PRIx64 " cross the end of %s\n", cmd, length, address, mem_name(&r[i]));
+            return false;
+        }
+#if UINTPTR_MAX < UINT64_MAX
+        if (address + length - 1 > UINTPTR_MAX)
+            continue; /* a region listed past the end of the address space */
+#endif
+        if ((r[i].flags & mem_width_flag(bytes)) == 0)
+        {
+            printf("%s: %s does not allow %u-bit access\n", cmd, mem_name(&r[i]), bytes * 8);
+            return false;
+        }
+        if (write && (r[i].flags & TDSH_MEM_READONLY) != 0)
+        {
+            printf("%s: %s is read-only\n", cmd, mem_name(&r[i]));
+            return false;
+        }
+        return true;
+    }
+    printf("%s: 0x%" PRIx64 " is not in a region this port allows (peek -l)\n", cmd, address);
+    return false;
+}
+
+static uint32_t mem_read(uintptr_t address, unsigned bytes)
+{
+    if (bytes == 1)
+        return *(const volatile uint8_t *)address;
+    if (bytes == 2)
+        return *(const volatile uint16_t *)address;
+    return *(const volatile uint32_t *)address;
+}
+
+static void mem_write(uintptr_t address, unsigned bytes, uint32_t value)
+{
+    if (bytes == 1)
+        *(volatile uint8_t *)address = (uint8_t)value;
+    else if (bytes == 2)
+        *(volatile uint16_t *)address = (uint16_t)value;
+    else
+        *(volatile uint32_t *)address = value;
+}
+
+static int mem_list(void)
+{
+    size_t count;
+    const tdsh_mem_region_t *r = mem_regions(&count);
+    printf("%-16s %-18s %-18s %-9s %s\n", "REGION", "START", "END", "WIDTHS", "ACCESS");
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (r[i].size == 0)
+            continue;
+        char start[24], end[24], widths[12];
+        snprintf(start, sizeof(start), "0x%08" PRIxPTR, r[i].start);
+        snprintf(end, sizeof(end), "0x%08" PRIxPTR, (uintptr_t)(r[i].start + (r[i].size - 1)));
+        snprintf(widths, sizeof(widths), "%s%s%s",
+                 (r[i].flags & TDSH_MEM_8) ? "8 " : "",
+                 (r[i].flags & TDSH_MEM_16) ? "16 " : "",
+                 (r[i].flags & TDSH_MEM_32) ? "32 " : "");
+        printf("%-16s %-18s %-18s %-9s %s\n", mem_name(&r[i]), start, end, widths,
+               (r[i].flags & TDSH_MEM_READONLY) ? "read" : "read/write");
+    }
+    return 0;
+}
+
+static int cmd_peek(tdsh_session_t *session, int argc, char **argv)
+{
+    (void)session;
+    if (argc == 2 && strcmp(argv[1], "-l") == 0)
+        return mem_list();
+
+    unsigned bytes;
+    int first = mem_width(argc, argv, &bytes);
+    uint64_t address;
+    uint64_t count = 1;
+    if (first < 0 || argc - first < 1 || argc - first > 2 || !mem_number(argv[first], &address))
+        return usage(tdsh_command_find("peek"));
+    bool dump = argc - first == 2;
+    if (dump && (!mem_number(argv[first + 1], &count) || count == 0 || count > UINT64_MAX / bytes))
+        return usage(tdsh_command_find("peek"));
+    if (!mem_allowed("peek", address, count * bytes, bytes, false))
+        return 1;
+
+    if (!dump)
+    {
+        /* Just the value, for V=$(peek ...) in scripts. */
+        printf("0x%0*" PRIx32 "\n", (int)bytes * 2, mem_read((uintptr_t)address, bytes));
+        return 0;
+    }
+    const uint64_t per_line = 16 / bytes;
+    for (uint64_t n = 0; n < count; ++n)
+    {
+        uintptr_t at = (uintptr_t)(address + n * bytes);
+        if (n % per_line == 0)
+            printf("%s0x%08" PRIxPTR ":", n ? "\n" : "", at);
+        printf(" %0*" PRIx32, (int)bytes * 2, mem_read(at, bytes));
+    }
+    printf("\n");
+    return 0;
+}
+
+static int cmd_poke(tdsh_session_t *session, int argc, char **argv)
+{
+    (void)session;
+    unsigned bytes;
+    int first = mem_width(argc, argv, &bytes);
+    uint64_t address;
+    uint64_t value;
+    if (first < 0 || argc - first != 2 || !mem_number(argv[first], &address) ||
+        !mem_number(argv[first + 1], &value))
+    {
+        return usage(tdsh_command_find("poke"));
+    }
+    if (value > (UINT32_MAX >> (32 - bytes * 8)))
+    {
+        printf("poke: 0x%" PRIx64 " does not fit in %u bits\n", value, bytes * 8);
+        return 1;
+    }
+    if (!mem_allowed("poke", address, bytes, bytes, true))
+        return 1;
+    mem_write((uintptr_t)address, bytes, (uint32_t)value);
     return 0;
 }
