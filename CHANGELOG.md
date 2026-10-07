@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+* **nano with UTF-8 text:** the cursor moved by bytes, so Left, Right,
+  Backspace and Delete stopped inside a character such as `é`, `ж` or `日`
+  and Backspace left broken bytes behind. Now they move over and delete
+  whole characters, Up and Down keep the character column, a typed
+  character is read whole before it is drawn, long lines scroll by
+  character, the status line and Ctrl+C count characters, search accepts
+  UTF-8, and invalid bytes show as `?`. Each character takes one column,
+  as in the line editor. Reported in tinydesk #4.
 * **`peek` and `poke`** read and write memory, for RAM and peripheral
   registers: `peek -l`, `peek [-w 8|16|32] <address> [count]`,
   `poke [-w 8|16|32] <address> <value>`. Root only, 32-bit by default; one

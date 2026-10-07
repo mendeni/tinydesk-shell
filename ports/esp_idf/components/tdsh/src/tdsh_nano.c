@@ -70,9 +70,9 @@ typedef struct
     size_t line_cap;
 
     size_t cy;
-    size_t cx;
+    size_t cx;   /* byte offset in the line, always at a character's start */
     size_t top;
-    size_t left;
+    size_t left; /* first character column shown */
 
     bool modified;
     bool loaded_existing;
@@ -101,6 +101,70 @@ static unsigned text_cols(const nano_editor_t *ed)
 static unsigned status_row(const nano_editor_t *ed)
 {
     return ed->rows - 2U;
+}
+
+/*
+ * UTF-8: lines are kept as bytes, but the cursor moves, deletes and counts
+ * columns by character, one column each (as the shell's line editor). A
+ * character is a byte that is not a continuation byte (10xxxxxx) together
+ * with the continuation bytes after it; invalid bytes are shown as '?'.
+ */
+static bool utf8_cont(unsigned char c)
+{
+    return (c & 0xC0U) == 0x80U;
+}
+
+/* Bytes in the sequence this lead byte starts: 1 for ASCII and invalid bytes. */
+static size_t utf8_seq_len(unsigned char c)
+{
+    if (c >= 0xC2U && c <= 0xDFU)
+        return 2U;
+    if (c >= 0xE0U && c <= 0xEFU)
+        return 3U;
+    if (c >= 0xF0U && c <= 0xF4U)
+        return 4U;
+    return 1U;
+}
+
+static size_t utf8_next(const char *s, size_t len, size_t at)
+{
+    if (at >= len)
+        return len;
+    at++;
+    while (at < len && utf8_cont((unsigned char)s[at]))
+        at++;
+    return at;
+}
+
+static size_t utf8_prev(const char *s, size_t at)
+{
+    if (at == 0)
+        return 0;
+    at--;
+    while (at > 0 && utf8_cont((unsigned char)s[at]))
+        at--;
+    return at;
+}
+
+/* The character column of byte offset `at`. */
+static size_t utf8_column(const char *s, size_t at)
+{
+    size_t col = 0;
+    for (size_t i = 0; i < at; ++i)
+    {
+        if (i == 0 || !utf8_cont((unsigned char)s[i]))
+            col++;
+    }
+    return col;
+}
+
+/* The byte offset of character column `col`, or the line's end. */
+static size_t utf8_offset(const char *s, size_t len, size_t col)
+{
+    size_t at = 0;
+    while (col-- > 0 && at < len)
+        at = utf8_next(s, len, at);
+    return at;
 }
 
 static void term_move(unsigned row, unsigned col)
@@ -437,25 +501,37 @@ static void editor_scroll(nano_editor_t *ed)
         ed->top = ed->cy - text_rows(ed) + 1U;
     }
 
-    if (ed->cx < ed->left)
-        ed->left = ed->cx;
-    if (ed->cx >= ed->left + text_cols(ed))
+    size_t col = utf8_column(ed->lines[ed->cy].data, ed->cx);
+    if (col < ed->left)
+        ed->left = col;
+    if (col >= ed->left + text_cols(ed))
     {
-        ed->left = ed->cx - text_cols(ed) + 1U;
+        ed->left = col - text_cols(ed) + 1U;
     }
 }
 
+/* At most `width` characters: whole UTF-8 sequences, '?' for control
+ * characters and invalid or cut-off bytes. */
 static void print_clipped(const char *text, size_t len, size_t width)
 {
-    size_t n = len < width ? len : width;
-    for (size_t i = 0; i < n; ++i)
+    size_t i = 0;
+    for (size_t col = 0; col < width && i < len; ++col)
     {
+        size_t end = utf8_next(text, len, i);
         unsigned char ch = (unsigned char)text[i];
-        if (ch == '\t')
-            ch = ' ';
-        if (ch < 0x20 || ch == 0x7F)
-            ch = '?';
-        putchar((char)ch);
+        if (end - i > 1U && end - i == utf8_seq_len(ch))
+        {
+            fwrite(text + i, 1, end - i, stdout);
+        }
+        else
+        {
+            if (ch == '\t')
+                ch = ' ';
+            if (ch < 0x20 || ch >= 0x7F || end - i > 1U)
+                ch = '?';
+            putchar((char)ch);
+        }
+        i = end;
     }
 }
 
@@ -499,10 +575,11 @@ static void editor_draw(nano_editor_t *ed)
         }
 
         nano_line_t *line = &ed->lines[li];
-        if (ed->left < line->len)
+        size_t from = utf8_offset(line->data, line->len, ed->left);
+        if (from < line->len)
         {
-            print_clipped(line->data + ed->left,
-                          line->len - ed->left,
+            print_clipped(line->data + from,
+                          line->len - from,
                           text_cols(ed));
         }
     }
@@ -512,6 +589,7 @@ static void editor_draw(nano_editor_t *ed)
     term_clear_line();
     printf("\033[7m");
     char statline[NANO_SCREEN_COLS + 1];
+    size_t cur_col = utf8_column(ed->lines[ed->cy].data, ed->cx);
     if (ed->status[0])
     {
         snprintf(statline, sizeof(statline), " %.77s", ed->status);
@@ -522,7 +600,7 @@ static void editor_draw(nano_editor_t *ed)
                  " Line %u/%u  Col %u  %s",
                  (unsigned)(ed->cy + 1U),
                  (unsigned)ed->line_count,
-                 (unsigned)(ed->cx + 1U),
+                 (unsigned)(cur_col + 1U),
                  ed->modified ? "Modified" : "Unmodified");
     }
     print_clipped(statline, strlen(statline), text_cols(ed));
@@ -542,7 +620,7 @@ static void editor_draw(nano_editor_t *ed)
     }
 
     unsigned crow = 2U + (unsigned)(ed->cy - ed->top);
-    unsigned ccol = 1U + (unsigned)(ed->cx - ed->left);
+    unsigned ccol = 1U + (unsigned)(cur_col - ed->left);
     if (crow > ed->rows - 3U)
         crow = ed->rows - 3U;
     if (ccol > text_cols(ed))
@@ -683,24 +761,52 @@ static int editor_read_key(void)
     }
 }
 
-static int editor_insert_char(nano_editor_t *ed, unsigned char ch)
+/* Insert one character: n bytes (a whole UTF-8 sequence) at the cursor. */
+static int editor_insert_bytes(nano_editor_t *ed, const unsigned char *bytes, size_t n)
 {
     nano_line_t *line = &ed->lines[ed->cy];
-    if (line->len >= NANO_MAX_LINE_BYTES)
+    if ((size_t)line->len + n > NANO_MAX_LINE_BYTES)
         return -E2BIG;
 
-    int rc = line_reserve(line, (size_t)line->len + 2U);
+    int rc = line_reserve(line, (size_t)line->len + n + 1U);
     if (rc != 0)
         return rc;
 
-    memmove(line->data + ed->cx + 1U,
+    memmove(line->data + ed->cx + n,
             line->data + ed->cx,
             (size_t)line->len - ed->cx + 1U);
-    line->data[ed->cx] = (char)ch;
-    line->len++;
-    ed->cx++;
+    memcpy(line->data + ed->cx, bytes, n);
+    line->len = (uint16_t)((size_t)line->len + n);
+    ed->cx += n;
     ed->modified = true;
     return 0;
+}
+
+static int editor_insert_char(nano_editor_t *ed, unsigned char ch)
+{
+    return editor_insert_bytes(ed, &ch, 1U);
+}
+
+/* A typed character: the lead byte, then its UTF-8 continuation bytes, so a
+ * character is never stored or drawn in halves. */
+static int editor_insert_typed(nano_editor_t *ed, unsigned char lead)
+{
+    unsigned char seq[4] = {lead};
+    size_t n = 1U;
+    size_t want = utf8_seq_len(lead);
+    while (n < want)
+    {
+        int c = read_byte();
+        if (c < 0)
+            break;
+        if (!utf8_cont((unsigned char)c))
+        {
+            ungetc(c, stdin);
+            break;
+        }
+        seq[n++] = (unsigned char)c;
+    }
+    return editor_insert_bytes(ed, seq, n);
 }
 
 static int editor_insert_spaces(nano_editor_t *ed, unsigned count)
@@ -750,11 +856,12 @@ static int editor_backspace(nano_editor_t *ed)
 
     if (ed->cx > 0)
     {
-        memmove(line->data + ed->cx - 1U,
+        size_t from = utf8_prev(line->data, ed->cx);
+        memmove(line->data + from,
                 line->data + ed->cx,
                 (size_t)line->len - ed->cx + 1U);
-        line->len--;
-        ed->cx--;
+        line->len = (uint16_t)(line->len - (ed->cx - from));
+        ed->cx = from;
         ed->modified = true;
         return 0;
     }
@@ -789,10 +896,11 @@ static int editor_delete(nano_editor_t *ed)
 
     if (ed->cx < line->len)
     {
+        size_t to = utf8_next(line->data, line->len, ed->cx);
         memmove(line->data + ed->cx,
-                line->data + ed->cx + 1U,
-                (size_t)line->len - ed->cx);
-        line->len--;
+                line->data + to,
+                (size_t)line->len - to + 1U);
+        line->len = (uint16_t)(line->len - (to - ed->cx));
         ed->modified = true;
         return 0;
     }
@@ -874,6 +982,9 @@ static int editor_paste_line(nano_editor_t *ed)
 
 static void editor_move(nano_editor_t *ed, int key)
 {
+    nano_line_t *line = &ed->lines[ed->cy];
+    size_t col = utf8_column(line->data, ed->cx); /* kept by Up/Down and PgUp/PgDn */
+
     switch (key)
     {
     case NKEY_UP:
@@ -887,31 +998,31 @@ static void editor_move(nano_editor_t *ed, int key)
     case NKEY_LEFT:
         if (ed->cx > 0)
         {
-            ed->cx--;
+            ed->cx = utf8_prev(line->data, ed->cx);
         }
         else if (ed->cy > 0)
         {
             ed->cy--;
             ed->cx = ed->lines[ed->cy].len;
         }
-        break;
+        return;
     case NKEY_RIGHT:
-        if (ed->cx < ed->lines[ed->cy].len)
+        if (ed->cx < line->len)
         {
-            ed->cx++;
+            ed->cx = utf8_next(line->data, line->len, ed->cx);
         }
         else if (ed->cy + 1U < ed->line_count)
         {
             ed->cy++;
             ed->cx = 0;
         }
-        break;
+        return;
     case NKEY_HOME:
         ed->cx = 0;
-        break;
+        return;
     case NKEY_END:
-        ed->cx = ed->lines[ed->cy].len;
-        break;
+        ed->cx = line->len;
+        return;
     case NKEY_PGUP:
         if (ed->cy > text_rows(ed))
             ed->cy -= text_rows(ed);
@@ -924,11 +1035,12 @@ static void editor_move(nano_editor_t *ed, int key)
             ed->cy = ed->line_count - 1U;
         break;
     default:
-        break;
+        return;
     }
 
-    if (ed->cx > ed->lines[ed->cy].len)
-        ed->cx = ed->lines[ed->cy].len;
+    /* Another line: the same character column, or its end. */
+    line = &ed->lines[ed->cy];
+    ed->cx = utf8_offset(line->data, line->len, col);
 }
 
 static int editor_prompt(nano_editor_t *ed, const char *prompt,
@@ -957,15 +1069,35 @@ static int editor_prompt(nano_editor_t *ed, const char *prompt,
 
         if (key == 8 || key == 127)
         {
-            if (len)
-                out[--len] = '\0';
+            len = utf8_prev(out, len); /* a whole character */
+            out[len] = '\0';
             continue;
         }
 
-        if (key >= 0x20 && key < 0x7F && len + 1U < out_size)
+        if (key >= 0x20 && key <= 0xFF && key != 0x7F)
         {
-            out[len++] = (char)key;
-            out[len] = '\0';
+            /* A character with its UTF-8 continuation bytes, if it fits whole. */
+            char seq[4] = {(char)key};
+            size_t n = 1U;
+            size_t want = utf8_seq_len((unsigned char)key);
+            while (n < want)
+            {
+                int c = read_byte();
+                if (c < 0)
+                    break;
+                if (!utf8_cont((unsigned char)c))
+                {
+                    ungetc(c, stdin);
+                    break;
+                }
+                seq[n++] = (char)c;
+            }
+            if (len + n < out_size)
+            {
+                memcpy(out + len, seq, n);
+                len += n;
+                out[len] = '\0';
+            }
         }
     }
 }
@@ -1164,7 +1296,7 @@ int tdsh_cmd_nano(tdsh_session_t *session, int argc, char **argv)
                      "line %u/%u, column %u",
                      (unsigned)(ed.cy + 1U),
                      (unsigned)ed.line_count,
-                     (unsigned)(ed.cx + 1U));
+                     (unsigned)(utf8_column(ed.lines[ed.cy].data, ed.cx) + 1U));
             status_set(&ed, msg);
             break;
         }
@@ -1210,7 +1342,7 @@ int tdsh_cmd_nano(tdsh_session_t *session, int argc, char **argv)
         default:
             if (key >= 0x20 && key <= 0xFF)
             {
-                rc = editor_insert_char(&ed, (unsigned char)key);
+                rc = editor_insert_typed(&ed, (unsigned char)key);
             }
             break;
         }
