@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+* **Ports can set the script memory limits:** `TDSH_MAX_VARS`,
+  `TDSH_VAR_NAME_MAX`, `TDSH_VAR_VALUE_MAX` and `TDSH_SCRIPT_TASK_STACK`
+  can be defined by the build. The defaults are unchanged: 64 variables,
+  32-byte names, 256-byte values and 32768 bytes of stack per script
+  worker. `TDSH_VAR_NAME_MAX` also limits function names in scripts.
+  Every component that includes `tdsh.h` must use the same values (#4).
+
 ## 0.1.5 (2026-10-06)
 
 * **STANDARDS.md** sets out the names, code style, commands, board keys,
