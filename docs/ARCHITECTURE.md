@@ -39,7 +39,8 @@ private clone. Future SSH/WebSocket/USB sessions should not share cwd/variables.
 ## Platform API
 
 The platform API is intentionally small: time, sleep/yield, random bytes,
-allocator hooks and a worker primitive. Standard C filesystem APIs remain in
+allocator hooks, a worker primitive and, optionally, the memory regions
+`peek` and `poke` may access. Standard C filesystem APIs remain in
 core where the platform VFS supports them.
 
 ## ESP-IDF ownership

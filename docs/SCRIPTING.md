@@ -197,10 +197,14 @@ as `uscript: /root/x.tdsh:12: …` naming the file and line.
 | Lines per script | 1024 |
 | Words per command | 48 |
 | Variables per session | 64; names up to 31 characters, values up to 255 bytes |
-| Functions per script | 24, nested calls up to 8 deep |
+| Functions per script | 24, names up to 31 characters, nested calls up to 8 deep |
 | `if` / `elseif` branches | 16 per block |
 | Pipe stages | 8 |
 | `$(…)` output | 8 KB |
+
+The variable limits and the name length are defaults: a port can set
+`TDSH_MAX_VARS`, `TDSH_VAR_NAME_MAX` (variable and function names) and
+`TDSH_VAR_VALUE_MAX` from its build (README, *Memory limits for ports*).
 
 ## Not supported
 

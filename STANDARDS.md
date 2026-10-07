@@ -399,8 +399,13 @@ these are changed when the files are next worked on.
 - `tdsh_espidf.h` uses the guard `TDSH_ESP_IDF_H`.
 - `src/core/tdsh_board.c` allocates with the C library's `realloc()` and
   `calloc()` instead of the allocator hooks.
-- The limits in `tdsh.h` (`TDSH_MAX_LINE` and the rest) are not wrapped in
-  `#ifndef`, so a build cannot override them.
+- Most limits in `tdsh.h` (`TDSH_MAX_LINE`, `TDSH_MAX_ARGS`,
+  `TDSH_MAX_PATH` and others) are not wrapped in `#ifndef`, so a build
+  cannot override them; only `TDSH_MAX_VARS`, `TDSH_VAR_NAME_MAX`,
+  `TDSH_VAR_VALUE_MAX` and `TDSH_SCRIPT_TASK_STACK` can be.
+- The Editor's limits (`TD_EDITOR_MAX`, `TD_EDITOR_UNDO`,
+  `TD_EDITOR_UNDO_OPS`) are in `apps/editor.c`, not `td_config.h`; they
+  are wrapped in `#ifndef`.
 - `lan` shows its state with no subcommand, not `lan status`.
 - Board projects are in `ports/<board>/` in TinyDesk but in `projects/<board>/`
   (and the repository root for the ESP32-C6) in TinyDesk Shell.
