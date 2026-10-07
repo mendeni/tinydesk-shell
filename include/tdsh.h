@@ -20,9 +20,10 @@ extern "C" {
 #define TDSH_MAX_REAL_PATH (TDSH_MAX_PATH * 2 + 96)
 /* The variable table costs TDSH_MAX_VARS * (1 + TDSH_VAR_NAME_MAX +
  * TDSH_VAR_VALUE_MAX) bytes in every session, including each script's copy.
- * Buffer sizes include the terminating NUL.  An override must apply to every
- * component using tdsh.h (core, ports and consumers such as TinyDesk), since
- * these limits change tdsh_session_t's layout. */
+ * Buffer sizes include the terminating NUL.  TDSH_VAR_NAME_MAX also sizes
+ * function names.  An override must apply to every component using tdsh.h
+ * (core, ports and consumers such as TinyDesk), since these limits change
+ * tdsh_session_t's layout. */
 #ifndef TDSH_MAX_VARS
 #define TDSH_MAX_VARS 64
 #endif

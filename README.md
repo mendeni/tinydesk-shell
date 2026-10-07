@@ -150,7 +150,8 @@ explain the host ports.
 `TDSH_SCRIPT_TASK_STACK` in `tdsh.h` can be set by the build. Their defaults
 are 64 variables, 32-byte name buffers, 256-byte value buffers and 32768
 bytes of stack requested per script worker. The buffers include the final
-NUL. Each script keeps its own copy of the session and its variables.
+NUL. `TDSH_VAR_NAME_MAX` also limits the length of function names in
+scripts. Each script keeps its own copy of the session and its variables.
 
 Apply the same overrides to **every component that includes `tdsh.h`**,
 including the shell core, the platform port and consumers such as TinyDesk.
